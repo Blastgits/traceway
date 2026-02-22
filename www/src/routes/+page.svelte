@@ -346,9 +346,9 @@
 	<div class="px-6 md:px-10 max-w-[1400px]">
 		<InView>
 			<div class="mb-12">
-				<span class="font-mono text-[11px] uppercase tracking-widest text-accent/70">05 / Dashboard</span>
+				<span class="font-mono text-[11px] uppercase tracking-widest text-accent/70">05 / Trace hierarchy</span>
 				<h2 class="text-3xl font-semibold tracking-tight text-text mt-3 sm:text-4xl">
-					See your traces in real time
+					Every call, every span, every token
 				</h2>
 			</div>
 		</InView>
@@ -360,38 +360,75 @@
 					<div class="h-2 w-2 rounded-full bg-text-muted/25"></div>
 					<div class="h-2 w-2 rounded-full bg-text-muted/25"></div>
 					<div class="h-2 w-2 rounded-full bg-text-muted/25"></div>
-					<div class="ml-6 flex-1 h-4 rounded bg-bg-tertiary max-w-xs"></div>
+					<span class="ml-3 text-[10px] text-text-muted font-mono uppercase">Trace detail</span>
+					<div class="ml-auto text-[10px] text-text-muted font-mono">1.24s total</div>
 				</div>
-				<div class="p-5 min-h-[340px] flex flex-col gap-4">
-					<div class="flex gap-4 h-full">
-						<!-- Sidebar -->
-						<div class="hidden sm:flex flex-col gap-2 w-36 shrink-0">
-							{#each ['Traces', 'Analytics', 'Models', 'Settings'] as item, i}
-								<div class="h-7 rounded {i === 0 ? 'bg-accent/10 border border-accent/20' : 'bg-bg-tertiary/50'} flex items-center px-3">
-									<span class="text-[10px] font-mono uppercase {i === 0 ? 'text-accent' : 'text-text-muted'}">{item}</span>
+
+				<!-- Trace header -->
+				<div class="border-b border-border/40 px-5 py-3 flex items-center justify-between">
+					<div class="flex items-center gap-3">
+						<span class="text-accent font-mono text-sm font-medium">chat-with-rag</span>
+						<span class="text-[10px] font-mono text-text-muted bg-bg-tertiary px-2 py-0.5 rounded">trace</span>
+						<span class="text-[10px] font-mono text-accent/60 bg-accent/5 px-2 py-0.5 rounded border border-accent/10">ok</span>
+					</div>
+					<div class="flex items-center gap-4 text-[10px] font-mono text-text-muted">
+						<span>7 spans</span>
+						<span>$0.0034</span>
+					</div>
+				</div>
+
+				<!-- Trace waterfall -->
+				<div class="p-5 space-y-1">
+					<!-- Time axis -->
+					<div class="flex items-center mb-3 pl-[220px] sm:pl-[280px]">
+						<div class="flex-1 flex justify-between text-[9px] font-mono text-text-muted/50">
+							<span>0ms</span>
+							<span>250ms</span>
+							<span>500ms</span>
+							<span>750ms</span>
+							<span>1000ms</span>
+							<span>1240ms</span>
+						</div>
+					</div>
+
+					{#each [
+						{ name: 'chat-with-rag', kind: 'trace', depth: 0, start: 0, width: 100, dur: '1240ms', color: 'bg-accent/25', border: 'border-accent/40' },
+						{ name: 'embed-query', kind: 'llm_call', depth: 1, start: 2, width: 12, dur: '148ms', color: 'bg-purple-400/25', border: 'border-purple-400/40', model: 'text-embedding-3-small' },
+						{ name: 'vector-search', kind: 'custom', depth: 1, start: 14, width: 8, dur: '95ms', color: 'bg-cyan-400/25', border: 'border-cyan-400/40' },
+						{ name: 'build-context', kind: 'custom', depth: 1, start: 22, width: 4, dur: '45ms', color: 'bg-text-muted/15', border: 'border-text-muted/30' },
+						{ name: 'chat-completion', kind: 'llm_call', depth: 1, start: 26, width: 70, dur: '872ms', color: 'bg-accent/25', border: 'border-accent/40', model: 'gpt-4o' },
+						{ name: 'tool: search_docs', kind: 'custom', depth: 2, start: 32, width: 18, dur: '224ms', color: 'bg-amber-400/20', border: 'border-amber-400/30' },
+						{ name: 'chat-completion', kind: 'llm_call', depth: 2, start: 52, width: 42, dur: '520ms', color: 'bg-accent/25', border: 'border-accent/40', model: 'gpt-4o' },
+					] as span}
+						<div class="flex items-center group hover:bg-bg-tertiary/30 rounded transition-colors py-1 px-1 -mx-1">
+							<!-- Span name column -->
+							<div class="w-[210px] sm:w-[270px] shrink-0 flex items-center gap-1.5" style="padding-left: {span.depth * 20}px;">
+								{#if span.depth > 0}
+									<span class="text-border text-[10px]">└</span>
+								{/if}
+								<span class="font-mono text-[11px] text-text truncate">{span.name}</span>
+								{#if span.model}
+									<span class="text-[9px] font-mono text-text-muted/60 hidden sm:inline">{span.model}</span>
+								{/if}
+							</div>
+							<!-- Waterfall bar -->
+							<div class="flex-1 relative h-5">
+								<div
+									class="absolute top-0.5 h-4 rounded-sm {span.color} border {span.border} transition-all group-hover:brightness-125 flex items-center"
+									style="left: {span.start}%; width: {span.width}%;"
+								>
+									<span class="text-[9px] font-mono text-text-secondary px-1.5 truncate">{span.dur}</span>
 								</div>
-							{/each}
-						</div>
-						<!-- Content -->
-						<div class="flex-1 flex flex-col gap-3">
-							<div class="grid grid-cols-3 gap-3">
-								{#each [
-									{ label: 'Total traces', value: '12,847' },
-									{ label: 'Avg latency', value: '234ms' },
-									{ label: 'Total cost', value: '$4.82' }
-								] as stat}
-									<div class="rounded bg-bg-tertiary/50 p-3 border border-border/30">
-										<div class="text-[9px] text-text-muted font-mono uppercase">{stat.label}</div>
-										<div class="text-lg font-semibold text-text mt-1 font-mono">{stat.value}</div>
-									</div>
-								{/each}
-							</div>
-							<div class="flex-1 rounded bg-bg-tertiary/50 border border-border/30 min-h-[180px] flex items-end p-4 gap-[3px]">
-								{#each [35, 42, 55, 38, 62, 71, 45, 58, 80, 65, 72, 90, 68, 55, 78, 85, 70, 62, 88, 75, 60, 82, 69, 77] as h}
-									<div class="flex-1 rounded-t bg-accent/15 transition-all" style="height: {h}%"></div>
-								{/each}
 							</div>
 						</div>
+					{/each}
+
+					<!-- Span detail hint -->
+					<div class="pt-3 mt-2 border-t border-border/30 flex items-center gap-4 text-[10px] font-mono text-text-muted">
+						<span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-sm bg-accent/25 border border-accent/40"></span> llm_call</span>
+						<span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-sm bg-purple-400/25 border border-purple-400/40"></span> embedding</span>
+						<span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-sm bg-amber-400/20 border border-amber-400/30"></span> tool_call</span>
+						<span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-sm bg-text-muted/15 border border-text-muted/30"></span> custom</span>
 					</div>
 				</div>
 			</div>
