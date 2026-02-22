@@ -41,72 +41,74 @@
 	<!-- Glow -->
 	<div class="absolute top-1/3 right-0 w-[600px] h-[600px] bg-accent/[0.03] blur-[150px] rounded-full"></div>
 
-	<div class="relative px-6 md:px-10 max-w-[1400px]">
-		<InView>
-			<div class="flex flex-col gap-6 pt-32 md:pt-0">
-				<!-- Eyebrow -->
-				<div class="flex items-center gap-3">
-					<span class="h-px w-8 bg-accent/40"></span>
-					<span class="font-mono text-[11px] uppercase tracking-widest text-accent/70">Open source LLM observability</span>
-				</div>
-
-				<!-- Main headline — large, uppercase, monospace, not centered -->
-				<h1 class="font-mono text-[clamp(2.5rem,8vw,7rem)] font-semibold leading-[0.95] tracking-tighter text-text uppercase">
-					Trace every<br />
-					<span class="text-accent">LLM call</span>
-				</h1>
-
-				<!-- Subtext — left aligned, narrow measure -->
-				<p class="max-w-md text-[15px] leading-relaxed text-text-secondary mt-2">
-					Capture inputs, outputs, latency, tokens, and cost automatically.
-					Debug prompts in real time. Run on your laptop or deploy to the cloud.
-				</p>
-
-				<!-- CTAs — minimal -->
-				<div class="flex items-center gap-5 mt-6">
-					<a
-						href="https://platform.traceway.dev"
-						class="group flex items-center gap-2 bg-accent text-bg font-mono text-sm uppercase tracking-wide px-6 py-2.5 rounded transition-all hover:brightness-110 hover:shadow-[0_0_30px_rgba(110,231,183,0.2)]"
-					>
-						Get started
-						<svg class="h-3.5 w-3.5 transition-transform group-hover:translate-x-1" viewBox="0 0 8 8" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M0.826 7.536L0.112 6.822L5.768 1.18H2.03V0.2H7.462V5.66H6.426V1.936L0.826 7.536Z" fill="currentColor"/></svg>
-					</a>
-					<a
-						href="https://github.com/traceway"
-						target="_blank"
-						rel="noopener"
-						class="font-mono text-[12px] uppercase text-text-secondary hover:text-text transition-colors border-b border-text-muted hover:border-text-secondary pb-0.5"
-					>
-						View source
-					</a>
-				</div>
-			</div>
-		</InView>
-
-		<!-- Terminal — right-aligned on desktop, below on mobile -->
-		<InView delay={200}>
-			<div class="mt-16 md:mt-0 md:absolute md:right-10 md:bottom-[15vh] md:w-[480px]">
-				<div class="rounded border border-border bg-bg-secondary/80 backdrop-blur overflow-hidden shadow-2xl shadow-black/30">
-					<div class="flex items-center gap-2 border-b border-border/60 px-4 py-2.5">
-						<div class="h-2 w-2 rounded-full bg-text-muted/30"></div>
-						<div class="h-2 w-2 rounded-full bg-text-muted/30"></div>
-						<div class="h-2 w-2 rounded-full bg-text-muted/30"></div>
-						<span class="ml-3 text-[10px] text-text-muted font-mono uppercase">terminal</span>
+	<div class="relative mx-auto max-w-[1400px] px-6 md:px-16 lg:px-24">
+		<div class="flex flex-col lg:flex-row lg:items-center lg:justify-between lg:gap-16">
+			<!-- Left: text content -->
+			<InView>
+				<div class="flex flex-col gap-6 pt-32 lg:pt-0 lg:max-w-xl lg:shrink-0">
+					<!-- Eyebrow -->
+					<div class="flex items-center gap-3">
+						<span class="h-px w-8 bg-accent/40"></span>
+						<span class="font-mono text-[11px] uppercase tracking-widest text-accent/70">Open source LLM observability</span>
 					</div>
-					<div class="p-4 font-mono text-[12px] leading-relaxed">
-						<div class="text-text-muted">$ cargo install --path crates/daemon</div>
-						<div class="mt-2 text-text-muted">$ traceway --foreground --target-url https://api.openai.com</div>
-						<div class="mt-0.5 text-accent-dim">&#10003; API server listening on 127.0.0.1:3000</div>
-						<div class="mt-0.5 text-accent-dim">&#10003; Proxy listening on 127.0.0.1:3001</div>
-						<div class="mt-0.5 text-text-secondary">  target: https://api.openai.com</div>
-						<div class="mt-2 text-text-muted">$ OPENAI_BASE_URL=http://localhost:3001 python app.py</div>
-						<div class="mt-0.5 text-text-secondary">Tracing calls through proxy...</div>
-						<div class="mt-0.5 text-accent-dim">&#10003; 3 traces captured (247ms avg, $0.0012 total)</div>
-						<div class="mt-0.5 text-text-secondary">Dashboard: <span class="text-accent">http://localhost:3000</span></div>
+
+					<!-- Main headline — large, uppercase, monospace, not centered -->
+					<h1 class="font-mono text-[clamp(2.5rem,8vw,7rem)] font-semibold leading-[0.95] tracking-tighter text-text uppercase">
+						Trace every<br />
+						<span class="text-accent">LLM call</span>
+					</h1>
+
+					<!-- Subtext — left aligned, narrow measure -->
+					<p class="max-w-md text-[15px] leading-relaxed text-text-secondary mt-2">
+						Capture inputs, outputs, latency, tokens, and cost automatically.
+						Debug prompts in real time. Run on your laptop or deploy to the cloud.
+					</p>
+
+					<!-- CTAs — minimal -->
+					<div class="flex items-center gap-5 mt-6">
+						<a
+							href="https://platform.traceway.dev"
+							class="group flex items-center gap-2 bg-accent text-bg font-mono text-sm uppercase tracking-wide px-6 py-2.5 rounded transition-all hover:brightness-110 hover:shadow-[0_0_30px_rgba(110,231,183,0.2)]"
+						>
+							Get started
+							<svg class="h-3.5 w-3.5 transition-transform group-hover:translate-x-1" viewBox="0 0 8 8" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M0.826 7.536L0.112 6.822L5.768 1.18H2.03V0.2H7.462V5.66H6.426V1.936L0.826 7.536Z" fill="currentColor"/></svg>
+						</a>
+						<a
+							href="https://github.com/traceway"
+							target="_blank"
+							rel="noopener"
+							class="font-mono text-[12px] uppercase text-text-secondary hover:text-text transition-colors border-b border-text-muted hover:border-text-secondary pb-0.5"
+						>
+							View source
+						</a>
 					</div>
 				</div>
-			</div>
-		</InView>
+			</InView>
+
+			<!-- Right: terminal -->
+			<InView delay={200}>
+				<div class="mt-16 lg:mt-0 w-full lg:max-w-[520px]">
+					<div class="rounded border border-border bg-bg-secondary/80 backdrop-blur overflow-hidden shadow-2xl shadow-black/30">
+						<div class="flex items-center gap-2 border-b border-border/60 px-4 py-2.5">
+							<div class="h-2 w-2 rounded-full bg-text-muted/30"></div>
+							<div class="h-2 w-2 rounded-full bg-text-muted/30"></div>
+							<div class="h-2 w-2 rounded-full bg-text-muted/30"></div>
+							<span class="ml-3 text-[10px] text-text-muted font-mono uppercase">terminal</span>
+						</div>
+						<div class="p-4 font-mono text-[12px] leading-relaxed">
+							<div class="text-text-muted">$ cargo install --path crates/daemon</div>
+							<div class="mt-3 text-text-muted"># works with any provider — OpenAI, Anthropic, Ollama, etc.</div>
+							<div class="mt-0.5 text-text-muted">$ traceway --foreground --target-url https://api.openai.com</div>
+							<div class="mt-0.5 text-accent-dim">&#10003; API server on 127.0.0.1:3000</div>
+							<div class="mt-0.5 text-accent-dim">&#10003; Proxy on 127.0.0.1:3001 &#8594; https://api.openai.com</div>
+							<div class="mt-3 text-text-muted">$ python app.py  <span class="text-text-muted/50"># point your client at :3001</span></div>
+							<div class="mt-0.5 text-accent-dim">&#10003; 3 traces captured (247ms avg, $0.0012 total)</div>
+							<div class="mt-0.5 text-text-secondary">Dashboard: <span class="text-accent">http://localhost:3000</span></div>
+						</div>
+					</div>
+				</div>
+			</InView>
+		</div>
 	</div>
 
 	<!-- Bottom of hero — scroll hint -->
@@ -160,8 +162,8 @@
 					delay: 0
 				},
 				{
-					title: 'OpenAI compatible',
-					desc: 'Drop-in proxy that intercepts API calls. No code changes required. Works with any OpenAI-compatible provider.',
+					title: 'Any LLM provider',
+					desc: 'Transparent proxy that works with OpenAI, Anthropic, Ollama, or any OpenAI-compatible API. Auto-detects provider for token extraction.',
 					num: '05',
 					delay: 60
 				},
@@ -243,7 +245,7 @@
 							'Single binary, no containers',
 							'SQLite storage (zero config)',
 							'Full dashboard & API',
-							'OpenAI proxy built in',
+							'Transparent LLM proxy built in',
 							'Unlimited traces'
 						] as item}
 							<li class="flex items-center gap-3 text-text-secondary">
@@ -306,7 +308,7 @@
 					</h2>
 				</div>
 				<p class="text-sm text-text-secondary max-w-sm leading-relaxed">
-					Change your base_url to the Traceway proxy. No SDK, no wrapper, no other code changes.
+					Change your base_url to the Traceway proxy. Works with any provider. No SDK, no wrapper, no other code changes.
 				</p>
 			</div>
 		</InView>
@@ -321,12 +323,13 @@
 					{@html `<div class="p-5 font-mono text-[12px] leading-relaxed overflow-x-auto">
 <div><span class="text-text-muted">import</span> <span class="text-text">openai</span></div>
 <div class="mt-3"></div>
-<div class="text-text-muted"># Point at the Traceway proxy instead of OpenAI directly</div>
+<div class="text-text-muted"># Just change base_url to point at the Traceway proxy</span></div>
+<div class="text-text-muted"># Works with OpenAI, Anthropic, Ollama — any provider</div>
 <div><span class="text-text">client</span> <span class="text-text-muted">=</span> <span class="text-text">openai.OpenAI(</span></div>
-<div class="text-accent">    base_url=<span class="text-accent-dim">"http://localhost:3001/v1"</span><span class="text-text-muted">,</span>  <span class="text-text-muted"># proxy on :3001</span></div>
+<div class="text-accent">    base_url=<span class="text-accent-dim">"http://localhost:3001/v1"</span>  <span class="text-text-muted"># Traceway proxy</span></div>
 <div><span class="text-text">)</span></div>
 <div class="mt-3"></div>
-<div class="text-text-muted"># Use normally. Every call is traced automatically.</div>
+<div class="text-text-muted"># Every call is traced automatically — no other changes needed</div>
 <div><span class="text-text">response</span> <span class="text-text-muted">=</span> <span class="text-text">client.chat.completions.create(</span></div>
 <div>    <span class="text-text">model=</span><span class="text-accent-dim">"gpt-4o"</span><span class="text-text-muted">,</span></div>
 <div>    <span class="text-text">messages=[{"role": "user", "content": "Hello!"}]</span></div>
