@@ -12,6 +12,7 @@
 	let authConfig: AuthConfig = $state({ mode: 'local', features: [] });
 	let authMe: AuthMe | null = $state(null);
 	let authChecked = $state(false);
+	let apiUnreachable = $state(false);
 
 	// Auth pages don't need sidebar or auth check
 	const authPages = ['/login', '/signup', '/accept-invite', '/forgot-password', '/reset-password'];
@@ -38,7 +39,11 @@
 				authChecked = true;
 			})
 			.catch(() => {
-				// Can't reach API - assume local mode
+				// If VITE_API_URL was explicitly set (deployed platform), show error
+				// instead of silently falling through to local mode
+				if (import.meta.env.VITE_API_URL) {
+					apiUnreachable = true;
+				}
 				authChecked = true;
 			});
 
@@ -104,6 +109,18 @@
 	<!-- Loading auth state -->
 	<div class="min-h-screen flex items-center justify-center bg-bg">
 		<div class="text-text-muted text-sm">Loading...</div>
+	</div>
+{:else if apiUnreachable}
+	<div class="min-h-screen flex items-center justify-center bg-bg">
+		<div class="text-center space-y-3">
+			<div class="text-text font-bold text-lg">Cannot reach API</div>
+			<div class="text-text-muted text-sm max-w-md">
+				Unable to connect to the Traceway backend. Check that the daemon is running and <code class="text-accent">VITE_API_URL</code> is set correctly.
+			</div>
+			<button onclick={() => location.reload()} class="mt-2 px-4 py-1.5 text-sm bg-accent/10 text-accent rounded hover:bg-accent/20 transition-colors">
+				Retry
+			</button>
+		</div>
 	</div>
 {:else}
 	<div class="min-h-screen flex">
