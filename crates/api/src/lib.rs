@@ -32,7 +32,7 @@ use serde::{Deserialize, Serialize};
 use utoipa::{OpenApi, ToSchema};
 use tokio::sync::{broadcast, watch, RwLock};
 use tokio_stream::{wrappers::BroadcastStream, StreamExt};
-use tower_http::cors::{Any, CorsLayer};
+use tower_http::cors::{AllowOrigin, Any, CorsLayer};
 
 use storage::{analytics, FileFilter, PersistentStore, SpanFilter};
 
@@ -2339,10 +2339,25 @@ fn build_router(
         polar_webhook_secret,
     };
 
-    let cors = CorsLayer::new()
-        .allow_origin(Any)
-        .allow_methods(Any)
-        .allow_headers(Any);
+    // In cloud mode with a separate frontend origin, we need explicit origins
+    // and credentials support. ALLOWED_ORIGINS env var is comma-separated.
+    // In local mode (no env var), allow any origin without credentials.
+    let cors = if let Ok(origins) = std::env::var("ALLOWED_ORIGINS") {
+        let origins: Vec<axum::http::HeaderValue> = origins
+            .split(',')
+            .filter_map(|s| s.trim().parse().ok())
+            .collect();
+        CorsLayer::new()
+            .allow_origin(AllowOrigin::list(origins))
+            .allow_methods(Any)
+            .allow_headers(Any)
+            .allow_credentials(true)
+    } else {
+        CorsLayer::new()
+            .allow_origin(Any)
+            .allow_methods(Any)
+            .allow_headers(Any)
+    };
 
     // Auth middleware state (injected as Extension for `from_fn`)
     let auth_mw_state = AuthMiddlewareState {

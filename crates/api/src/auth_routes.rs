@@ -161,16 +161,31 @@ pub struct AcceptInviteRequest {
 // ── helpers ──────────────────────────────────────────────────────────
 
 /// Build a `Set-Cookie` header value for the session JWT.
+/// When ALLOWED_ORIGINS is set (cross-origin deployment), use SameSite=None; Secure
+/// so the cookie is sent on cross-origin requests from the frontend.
 fn session_cookie(token: &str) -> String {
-    format!(
-        "session={}; HttpOnly; SameSite=Lax; Path=/; Max-Age=604800",
-        token
-    )
+    let cross_origin = std::env::var("ALLOWED_ORIGINS").is_ok();
+    if cross_origin {
+        format!(
+            "session={}; HttpOnly; SameSite=None; Secure; Path=/; Max-Age=604800",
+            token
+        )
+    } else {
+        format!(
+            "session={}; HttpOnly; SameSite=Lax; Path=/; Max-Age=604800",
+            token
+        )
+    }
 }
 
 /// Build a `Set-Cookie` header that clears the session.
 fn clear_session_cookie() -> String {
-    "session=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0".to_string()
+    let cross_origin = std::env::var("ALLOWED_ORIGINS").is_ok();
+    if cross_origin {
+        "session=; HttpOnly; SameSite=None; Secure; Path=/; Max-Age=0".to_string()
+    } else {
+        "session=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0".to_string()
+    }
 }
 
 use base64::Engine;
