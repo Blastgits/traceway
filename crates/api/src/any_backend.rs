@@ -8,8 +8,9 @@ use async_trait::async_trait;
 use storage_sqlite::SqliteBackend;
 use storage_turbopuffer::TurbopufferBackend;
 use trace::{
-    Datapoint, DatapointId, Dataset, DatasetId, FileVersion, QueueItem, QueueItemId, Span, SpanId,
-    Trace, TraceId,
+    CaptureRule, CaptureRuleId, Datapoint, DatapointId, Dataset, DatasetId, EvalResult,
+    EvalResultId, EvalRun, EvalRunId, FileVersion, QueueItem, QueueItemId, Span, SpanId, Trace,
+    TraceId,
 };
 
 use storage::error::StorageError;
@@ -142,6 +143,60 @@ impl StorageBackend for AnyBackend {
         delegate!(self, delete_queue_item, id)
     }
 
+    // --- Eval Run operations ---
+
+    async fn save_eval_run(&self, run: &EvalRun) -> Result<(), StorageError> {
+        delegate!(self, save_eval_run, run)
+    }
+
+    async fn get_eval_run(&self, id: EvalRunId) -> Result<Option<EvalRun>, StorageError> {
+        delegate!(self, get_eval_run, id)
+    }
+
+    async fn list_eval_runs(&self, dataset_id: DatasetId) -> Result<Vec<EvalRun>, StorageError> {
+        delegate!(self, list_eval_runs, dataset_id)
+    }
+
+    async fn delete_eval_run(&self, id: EvalRunId) -> Result<bool, StorageError> {
+        delegate!(self, delete_eval_run, id)
+    }
+
+    // --- Eval Result operations ---
+
+    async fn save_eval_result(&self, result: &EvalResult) -> Result<(), StorageError> {
+        delegate!(self, save_eval_result, result)
+    }
+
+    async fn get_eval_result(&self, id: EvalResultId) -> Result<Option<EvalResult>, StorageError> {
+        delegate!(self, get_eval_result, id)
+    }
+
+    async fn list_eval_results(&self, run_id: EvalRunId) -> Result<Vec<EvalResult>, StorageError> {
+        delegate!(self, list_eval_results, run_id)
+    }
+
+    async fn delete_eval_run_results(&self, run_id: EvalRunId) -> Result<usize, StorageError> {
+        delegate!(self, delete_eval_run_results, run_id)
+    }
+
+    // --- Capture Rule operations ---
+
+    async fn save_capture_rule(&self, rule: &CaptureRule) -> Result<(), StorageError> {
+        delegate!(self, save_capture_rule, rule)
+    }
+
+    async fn get_capture_rule(&self, id: CaptureRuleId) -> Result<Option<CaptureRule>, StorageError> {
+        delegate!(self, get_capture_rule, id)
+    }
+
+    async fn list_capture_rules(&self, dataset_id: DatasetId) -> Result<Vec<CaptureRule>, StorageError> {
+        delegate!(self, list_capture_rules, dataset_id)
+    }
+
+    async fn delete_capture_rule(&self, id: CaptureRuleId) -> Result<bool, StorageError> {
+        delegate!(self, delete_capture_rule, id)
+    }
+
     // --- File operations ---
 
     async fn save_file_version(&self, version: &FileVersion) -> Result<(), StorageError> {
@@ -202,6 +257,32 @@ impl StorageBackend for AnyBackend {
 
     async fn load_all_files(&self) -> Result<Vec<FileVersion>, StorageError> {
         delegate!(self, load_all_files)
+    }
+
+    // --- Eval/Rule load-all ---
+
+    async fn load_all_eval_runs(&self) -> Result<Vec<EvalRun>, StorageError> {
+        delegate!(self, load_all_eval_runs)
+    }
+
+    async fn list_eval_runs_all(&self) -> Result<Vec<EvalRun>, StorageError> {
+        delegate!(self, list_eval_runs_all)
+    }
+
+    async fn load_all_eval_results(&self) -> Result<Vec<EvalResult>, StorageError> {
+        delegate!(self, load_all_eval_results)
+    }
+
+    async fn list_eval_results_all(&self) -> Result<Vec<EvalResult>, StorageError> {
+        delegate!(self, list_eval_results_all)
+    }
+
+    async fn load_all_capture_rules(&self) -> Result<Vec<CaptureRule>, StorageError> {
+        delegate!(self, load_all_capture_rules)
+    }
+
+    async fn list_capture_rules_all(&self) -> Result<Vec<CaptureRule>, StorageError> {
+        delegate!(self, list_capture_rules_all)
     }
 
     // --- Metadata ---
