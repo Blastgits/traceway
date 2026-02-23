@@ -11,8 +11,7 @@
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"generate-types": "openapi-typescript http://localhost:3000/api/openapi.json -o src/lib/api-types.ts",
-		"generate-types:file": "openapi-typescript ../openapi.json -o src/lib/api-types.ts",
-		"start": "node server.js"
+		"generate-types:file": "openapi-typescript ../openapi.json -o src/lib/api-types.ts"
 	},
 	"devDependencies": {
 		"@sveltejs/adapter-auto": "^7.0.0",
