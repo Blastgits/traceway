@@ -2349,7 +2349,14 @@ fn build_router(
             .collect();
         CorsLayer::new()
             .allow_origin(AllowOrigin::list(origins))
-            .allow_methods(Any)
+            .allow_methods([
+                axum::http::Method::GET,
+                axum::http::Method::POST,
+                axum::http::Method::PUT,
+                axum::http::Method::DELETE,
+                axum::http::Method::OPTIONS,
+                axum::http::Method::PATCH,
+            ])
             .allow_headers([
                 header::CONTENT_TYPE,
                 header::AUTHORIZATION,
