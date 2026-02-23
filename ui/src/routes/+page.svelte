@@ -1,8 +1,21 @@
 <script lang="ts">
-	import { getAnalyticsSummary, getSpans, subscribeEvents, type Span, type AnalyticsSummary } from '$lib/api';
+	import { getAnalyticsSummary, getSpans, subscribeEvents, API_BASE, type Span, type AnalyticsSummary } from '$lib/api';
 	import { spanStatus, spanStartedAt, spanModel, shortId } from '$lib/api';
 	import StatusBadge from '$lib/components/StatusBadge.svelte';
 	import { onMount } from 'svelte';
+
+	let copied = $state('');
+
+	function baseUrl() {
+		if (API_BASE.startsWith('http')) return API_BASE;
+		return window.location.origin + API_BASE;
+	}
+
+	async function copyText(text: string, id: string) {
+		await navigator.clipboard.writeText(text);
+		copied = id;
+		setTimeout(() => { if (copied === id) copied = ''; }, 2000);
+	}
 
 	let summary: AnalyticsSummary | null = $state(null);
 	let recentSpans: Span[] = $state([]);
@@ -82,50 +95,117 @@
 		<div class="text-text-muted text-sm py-8 text-center">Loading...</div>
 	{:else if !summary || (summary.total_traces === 0 && summary.total_spans === 0)}
 		<!-- Getting started -->
-		<div class="bg-bg-secondary border border-border rounded-lg p-8 space-y-6">
-			<div class="text-center space-y-2">
-				<div class="flex items-center justify-center gap-2 text-text-secondary">
-					<span class="w-2 h-2 rounded-full bg-success animate-pulse"></span>
-					<span class="text-sm">Daemon connected</span>
+		<div class="space-y-6">
+			<div class="space-y-1">
+				<div class="flex items-center gap-2">
+					<span class="w-1.5 h-1.5 rounded-full bg-success animate-pulse"></span>
+					<span class="text-sm text-text-secondary">Connected</span>
 				</div>
-				<p class="text-text-muted text-xs">Instrument your LLM application to start collecting traces.</p>
+				<p class="text-text-muted text-xs">Send your first trace to get started.</p>
 			</div>
 
-			<div class="space-y-4 max-w-2xl mx-auto">
-				<details class="group" open>
-					<summary class="text-xs text-text-secondary cursor-pointer hover:text-text transition-colors font-semibold">
-						Quick test with curl
+			<!-- Tabs -->
+			{#snippet codeBlock(id: string, code: string)}
+				<div class="relative group/code">
+					<pre class="bg-bg-tertiary border border-border rounded-lg p-4 text-[13px] text-text-secondary font-mono overflow-x-auto leading-relaxed">{code}</pre>
+					<button
+						onclick={() => copyText(code, id)}
+						class="absolute top-2.5 right-2.5 px-2 py-1 rounded text-[11px] font-mono
+							   bg-bg-secondary border border-border text-text-muted
+							   opacity-0 group-hover/code:opacity-100 transition-opacity
+							   hover:text-text hover:border-text-muted cursor-pointer"
+					>
+						{copied === id ? 'copied' : 'copy'}
+					</button>
+				</div>
+			{/snippet}
+
+			<div class="space-y-4">
+				<!-- Python SDK -->
+				<div class="space-y-2">
+					<div class="flex items-center gap-2">
+						<span class="text-xs font-semibold text-text tracking-wide">Python SDK</span>
+						<span class="text-[10px] text-text-muted font-mono bg-bg-tertiary px-1.5 py-0.5 rounded">recommended</span>
+					</div>
+					{@render codeBlock('py-install', 'pip install traceway')}
+					{@render codeBlock('py-usage', `from traceway import Traceway, LlmCallKind
+
+client = Traceway(
+    url="${baseUrl().replace('/api', '')}",
+    api_key="tw_sk_..."  # from Settings > API Keys
+)
+
+with client.trace("my-agent") as t:
+    with t.llm_call("inference",
+        model="gpt-4o",
+        provider="openai"
+    ) as span:
+        result = openai.chat.completions.create(...)
+        span.set_output({"response": result.choices[0].message.content})`)}
+				</div>
+
+				<!-- curl -->
+				<details class="group">
+					<summary class="text-xs font-semibold text-text-secondary cursor-pointer hover:text-text transition-colors tracking-wide">
+						curl
 					</summary>
-					<pre class="mt-2 bg-bg-tertiary rounded p-3 text-xs text-text-secondary font-mono overflow-x-auto whitespace-pre"># Create a trace first
-TRACE=$(curl -s localhost:3000/api/traces -X POST \
-  -H 'Content-Type: application/json' \
-  -d '{`{"name":"test-trace","tags":["manual"]}`}' | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
+					<div class="mt-2 space-y-2">
+						{@render codeBlock('curl', `# Create a trace
+TRACE=$(curl -s ${baseUrl()}/traces -X POST \\
+  -H 'Content-Type: application/json' \\
+  -H 'Authorization: Bearer tw_sk_...' \\
+  -d '{"name":"my-trace","tags":["test"]}' \\
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
 
 # Create a span in that trace
-curl -s localhost:3000/api/spans -X POST \
-  -H 'Content-Type: application/json' \
-  -d "{`{\"trace_id\":\"$TRACE\",\"name\":\"hello-world\",\"kind\":{\"type\":\"llm_call\",\"model\":\"gpt-4o\"}}`}"</pre>
+curl -s ${baseUrl()}/spans -X POST \\
+  -H 'Content-Type: application/json' \\
+  -H 'Authorization: Bearer tw_sk_...' \\
+  -d '{"trace_id":"'$TRACE'","name":"llm-call","kind":{"type":"llm_call","model":"gpt-4o"}}'
+
+# Complete the span
+curl -s ${baseUrl()}/spans/<SPAN_ID>/complete -X POST \\
+  -H 'Content-Type: application/json' \\
+  -H 'Authorization: Bearer tw_sk_...' \\
+  -d '{"output":{"result":"hello world"}}'`)}
+					</div>
 				</details>
 
+				<!-- Node.js -->
 				<details class="group">
-					<summary class="text-xs text-text-secondary cursor-pointer hover:text-text transition-colors font-semibold">
-						Dev ingest mode (synthetic data)
+					<summary class="text-xs font-semibold text-text-secondary cursor-pointer hover:text-text transition-colors tracking-wide">
+						Node.js / fetch
 					</summary>
-					<pre class="mt-2 bg-bg-tertiary rounded p-3 text-xs text-text-secondary font-mono overflow-x-auto whitespace-pre">cargo run -p daemon -- --foreground --dev-ingest --dev-ingest-interval 3</pre>
-				</details>
+					<div class="mt-2">
+						{@render codeBlock('node', `const API = "${baseUrl()}";
+const KEY = "tw_sk_...";
+const headers = {
+  "Content-Type": "application/json",
+  "Authorization": \`Bearer \${KEY}\`
+};
 
-				<details class="group">
-					<summary class="text-xs text-text-secondary cursor-pointer hover:text-text transition-colors font-semibold">
-						Python SDK
-					</summary>
-					<pre class="mt-2 bg-bg-tertiary rounded p-3 text-xs text-text-secondary font-mono overflow-x-auto whitespace-pre">pip install traceway
+// Create trace
+const trace = await fetch(\`\${API}/traces\`, {
+  method: "POST", headers,
+  body: JSON.stringify({ name: "my-agent", tags: ["prod"] })
+}).then(r => r.json());
 
-from traceway import TraceContext
+// Create span
+const span = await fetch(\`\${API}/spans\`, {
+  method: "POST", headers,
+  body: JSON.stringify({
+    trace_id: trace.id,
+    name: "llm-call",
+    kind: { type: "llm_call", model: "gpt-4o", provider: "openai" }
+  })
+}).then(r => r.json());
 
-ctx = TraceContext()
-with ctx.span("my-task") as s:
-    # ... your code ...
-    s.complete({`{"result": "done"}`})</pre>
+// Complete span
+await fetch(\`\${API}/spans/\${span.id}/complete\`, {
+  method: "POST", headers,
+  body: JSON.stringify({ output: { response: "..." } })
+});`)}
+					</div>
 				</details>
 			</div>
 		</div>

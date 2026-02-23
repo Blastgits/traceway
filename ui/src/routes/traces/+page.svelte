@@ -1,9 +1,14 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { getTraces, getSpans, subscribeEvents, type Span, type Trace } from '$lib/api';
+	import { getTraces, getSpans, subscribeEvents, API_BASE, type Span, type Trace } from '$lib/api';
 	import { spanStatus } from '$lib/api';
 	import TraceRow from '$lib/components/TraceRow.svelte';
 	import { onMount } from 'svelte';
+
+	function baseUrl() {
+		if (API_BASE.startsWith('http')) return API_BASE;
+		return window.location.origin + API_BASE;
+	}
 
 	let traces: Trace[] = $state([]);
 	let traceSpans: Map<string, Span[]> = $state(new Map());
@@ -130,59 +135,31 @@
 		<div class="text-text-muted text-sm text-center py-8">Loading...</div>
 	{:else if traces.length === 0}
 		<!-- Empty state -->
-		<div class="bg-bg-secondary border border-border rounded-lg p-8 space-y-6">
-			<div class="text-center space-y-2">
-				<div class="flex items-center justify-center gap-2 text-text-secondary">
-					<span class="w-2 h-2 rounded-full bg-success animate-pulse"></span>
-					<span class="text-sm">Listening for traces</span>
+		<div class="space-y-4">
+			<div class="space-y-1">
+				<div class="flex items-center gap-2">
+					<span class="w-1.5 h-1.5 rounded-full bg-success animate-pulse"></span>
+					<span class="text-xs text-text-secondary">Listening for traces</span>
 				</div>
-				<p class="text-text-muted text-xs">Traces are created automatically when your code uses the SDK or proxy. Send traces from your code to see them here.</p>
+				<p class="text-text-muted text-xs">Send traces from your code to see them here.</p>
 			</div>
 
-			<div class="space-y-4 max-w-2xl mx-auto">
-				<details class="group">
-					<summary class="text-xs text-text-secondary cursor-pointer hover:text-text transition-colors">
-						Quick test with curl
-					</summary>
-					<pre class="mt-2 bg-bg-tertiary rounded p-3 text-xs text-text-secondary font-mono overflow-x-auto whitespace-pre"># 1. Create a trace
-curl -s http://localhost:3000/api/traces -X POST \
-  -H 'Content-Type: application/json' \
-  -d '{`{"name":"my-trace"}`}'
+			<div class="relative group/code">
+				<pre class="bg-bg-tertiary border border-border rounded-lg p-4 text-[13px] text-text-secondary font-mono overflow-x-auto leading-relaxed">pip install traceway
 
-# 2. Create a span (use the trace_id from step 1)
-curl -s http://localhost:3000/api/spans -X POST \
-  -H 'Content-Type: application/json' \
-  -d '{`{"trace_id":"<ID>","name":"my-span","kind":{"type":"custom","kind":"task","attributes":{}}}`}'</pre>
-				</details>
+from traceway import Traceway, LlmCallKind
 
-				<details class="group">
-					<summary class="text-xs text-text-secondary cursor-pointer hover:text-text transition-colors">
-						Python SDK
-					</summary>
-					<pre class="mt-2 bg-bg-tertiary rounded p-3 text-xs text-text-secondary font-mono overflow-x-auto whitespace-pre">pip install traceway
+client = Traceway(url="{baseUrl().replace('/api', '')}")
 
-from traceway import TraceContext
-
-ctx = TraceContext()
-with ctx.span("my-task") as s:
-    # ... your code ...
-    s.complete({`{"result": "done"}`})</pre>
-				</details>
-
-				<details class="group">
-					<summary class="text-xs text-text-secondary cursor-pointer hover:text-text transition-colors">
-						TypeScript SDK
-					</summary>
-					<pre class="mt-2 bg-bg-tertiary rounded p-3 text-xs text-text-secondary font-mono overflow-x-auto whitespace-pre">npm install traceway
-
-import {`{ TraceContext }`} from "traceway";
-
-const ctx = new TraceContext();
-const span = ctx.span("my-task");
-// ... your code ...
-await span.complete({`{ result: "done" }`});</pre>
-				</details>
+with client.trace("my-agent") as t:
+    with t.llm_call("inference", model="gpt-4o") as span:
+        result = openai.chat.completions.create(...)
+        span.set_output({`{"response": result}`})</pre>
 			</div>
+
+			<p class="text-text-muted text-[11px]">
+				See <a href="/settings" class="text-accent hover:underline">Settings</a> for API keys and more examples.
+			</p>
 		</div>
 	{:else if filtered.length === 0}
 		<div class="text-text-muted text-sm text-center py-8">No traces match filters</div>
