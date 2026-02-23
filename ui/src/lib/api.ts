@@ -404,7 +404,7 @@ export const getAuthMe = () => get<AuthMe>('/auth/me');
 export const getOrg = () => get<OrgInfo>('/org');
 export const getApiKeys = () => get<ApiKeyInfo[]>('/org/api-keys');
 export const createApiKey = (name: string, scopes?: Scope[]) =>
-	post<ApiKeyCreated>('/org/api-keys', { name, scopes: scopes ?? [] });
+	post<ApiKeyCreated>('/org/api-keys', scopes ? { name, scopes } : { name });
 export const deleteApiKey = (id: string) => del<unknown>(`/org/api-keys/${id}`);
 export const getOrgMembers = () => get<OrgMember[]>('/org/members');
 
