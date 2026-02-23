@@ -482,7 +482,15 @@ async fn create_api_key_handler(
         (StatusCode::SERVICE_UNAVAILABLE, "Auth store not configured".into())
     })?;
 
-    let (generated, stored) = generate_api_key(ctx.org_id, req.name.clone(), req.scopes.clone());
+    // Safety net: if scopes are empty (e.g. client omitted them but sent []),
+    // fall back to default SDK scopes rather than creating a useless key.
+    let scopes = if req.scopes.is_empty() {
+        Scope::default_sdk()
+    } else {
+        req.scopes.clone()
+    };
+
+    let (generated, stored) = generate_api_key(ctx.org_id, req.name.clone(), scopes.clone());
 
     auth_store
         .save_api_key(&stored)
@@ -496,7 +504,7 @@ async fn create_api_key_handler(
             key: generated.key,
             name: req.name,
             key_prefix: generated.key_prefix,
-            scopes: req.scopes,
+            scopes,
         }),
     ))
 }
