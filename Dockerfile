@@ -1,5 +1,14 @@
-# Build stage
-FROM rust:1.75-slim as builder
+# UI build stage
+FROM node:20-slim AS ui-builder
+
+WORKDIR /app/ui
+COPY ui/package.json ui/package-lock.json ./
+RUN npm ci
+COPY ui/ ./
+RUN npm run build
+
+# Rust build stage
+FROM rust:1.83-slim AS builder
 
 # Install build dependencies
 RUN apt-get update && apt-get install -y \
@@ -12,6 +21,9 @@ WORKDIR /app
 # Copy workspace files
 COPY Cargo.toml Cargo.lock ./
 COPY crates ./crates
+
+# Copy pre-built UI assets (needed by rust-embed at compile time)
+COPY --from=ui-builder /app/ui/build ./ui/build
 
 # Build release binary with cloud features
 RUN cargo build --release -p daemon --features cloud
@@ -29,9 +41,6 @@ RUN apt-get update && apt-get install -y \
 # Copy binary from builder
 COPY --from=builder /app/target/release/daemon /usr/local/bin/traceway
 
-# Copy UI assets (pre-built)
-COPY ui/build /app/ui/build
-
 # Create non-root user
 RUN useradd -r -s /bin/false traceway
 USER traceway
@@ -45,8 +54,5 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
 # Environment variables (override at runtime)
 ENV RUST_LOG=info
 ENV STORAGE_BACKEND=turbopuffer
-# REDIS_URL - Redis connection string for pub/sub and BullMQ
-# TURBOPUFFER_API_KEY - Turbopuffer API key
-# TURBOPUFFER_NAMESPACE - Namespace prefix for multi-tenancy
 
 CMD ["traceway", "--cloud"]
