@@ -1,14 +1,9 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { getTraces, getSpans, subscribeEvents, API_BASE, type Span, type Trace } from '$lib/api';
+	import { getTraces, getSpans, subscribeEvents, type Span, type Trace } from '$lib/api';
 	import { spanStatus } from '$lib/api';
 	import TraceRow from '$lib/components/TraceRow.svelte';
 	import { onMount } from 'svelte';
-
-	function baseUrl() {
-		if (API_BASE.startsWith('http')) return API_BASE;
-		return window.location.origin + API_BASE;
-	}
 
 	let traces: Trace[] = $state([]);
 	let traceSpans: Map<string, Span[]> = $state(new Map());
@@ -135,30 +130,19 @@
 		<div class="text-text-muted text-sm text-center py-8">Loading...</div>
 	{:else if traces.length === 0}
 		<!-- Empty state -->
-		<div class="space-y-4">
-			<div class="space-y-1">
-				<div class="flex items-center gap-2">
-					<span class="w-1.5 h-1.5 rounded-full bg-success animate-pulse"></span>
-					<span class="text-xs text-text-secondary">Listening for traces</span>
-				</div>
-				<p class="text-text-muted text-xs">Send traces from your code to see them here.</p>
+		<div class="space-y-3 py-4">
+			<div class="flex items-center gap-2">
+				<span class="w-1.5 h-1.5 rounded-full bg-success animate-pulse"></span>
+				<span class="text-xs text-text-muted">Listening for traces</span>
 			</div>
 
-			<div class="relative group/code">
-				<pre class="bg-bg-tertiary border border-border rounded-lg p-4 text-[13px] text-text-secondary font-mono overflow-x-auto leading-relaxed">pip install traceway
+			<pre class="bg-bg-tertiary border border-border rounded p-3 text-[13px] text-text-secondary font-mono leading-relaxed"><span class="text-text-muted">pip install traceway</span>
 
-from traceway import Traceway, LlmCallKind
-
-client = Traceway(url="{baseUrl().replace('/api', '')}")
-
-with client.trace("my-agent") as t:
-    with t.llm_call("inference", model="gpt-4o") as span:
-        result = openai.chat.completions.create(...)
-        span.set_output({`{"response": result}`})</pre>
-			</div>
+from traceway import Traceway
+client = Traceway(api_key="tw_sk_...")</pre>
 
 			<p class="text-text-muted text-[11px]">
-				See <a href="/settings" class="text-accent hover:underline">Settings</a> for API keys and more examples.
+				Get your API key from <a href="/settings/api-keys" class="text-accent hover:underline">Settings &rarr; API Keys</a>
 			</p>
 		</div>
 	{:else if filtered.length === 0}
