@@ -1537,6 +1537,22 @@ async fn serve_ui(uri: Uri) -> Response {
     StatusCode::NOT_FOUND.into_response()
 }
 
+/// Scalar API docs page served at the root in cloud mode.
+async fn serve_scalar_docs() -> Html<&'static str> {
+    Html(r#"<!DOCTYPE html>
+<html>
+<head>
+  <title>Traceway API</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+</head>
+<body>
+  <script id="api-reference" data-url="/api/openapi.json"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
+</body>
+</html>"#)
+}
+
 // --- Auth Middleware ---
 
 /// Cached auth result with expiry.
@@ -1917,11 +1933,18 @@ fn build_router(
         .merge(protected)
         .merge(public);
 
-    Router::new()
-        .nest("/api", api)
-        // Embedded UI (SPA fallback)
-        .fallback(serve_ui)
-        .layer(cors)
+    let app = Router::new()
+        .nest("/api", api);
+
+    // In cloud mode, serve Scalar API docs at root; in local mode, serve embedded UI
+    let app = if state.auth_config.local_mode {
+        app.fallback(serve_ui)
+    } else {
+        app.route("/", get(serve_scalar_docs))
+            .fallback(|| async { StatusCode::NOT_FOUND })
+    };
+
+    app.layer(cors)
         .with_state(state)
 }
 

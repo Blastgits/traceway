@@ -5,3 +5,7 @@ node_modules
 prds/
 
 .env
+
+.svelte-kit/
+
+build/
