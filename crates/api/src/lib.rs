@@ -2350,7 +2350,13 @@ fn build_router(
         CorsLayer::new()
             .allow_origin(AllowOrigin::list(origins))
             .allow_methods(Any)
-            .allow_headers(Any)
+            .allow_headers([
+                header::CONTENT_TYPE,
+                header::AUTHORIZATION,
+                header::ACCEPT,
+                header::ORIGIN,
+                header::COOKIE,
+            ])
             .allow_credentials(true)
     } else {
         CorsLayer::new()
