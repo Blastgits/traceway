@@ -180,7 +180,7 @@ async fn shutdown_signal(mut shutdown_rx: watch::Receiver<bool>) {
 
 /// Run the API server with supervision (restart on crash).
 async fn run_api_supervised(
-    store: Arc<RwLock<PersistentStore<AnyBackend>>>,
+    org_stores: Arc<api::OrgStoreManager>,
     addr: String,
     start_time: Instant,
     config_json: serde_json::Value,
@@ -192,7 +192,7 @@ async fn run_api_supervised(
     let mut backoff = Duration::from_secs(1);
 
     loop {
-        let api_store = store.clone();
+        let api_stores = org_stores.clone();
         let api_addr = addr.clone();
         let api_start_time = start_time;
         let api_config = config_json.clone();
@@ -203,7 +203,7 @@ async fn run_api_supervised(
         info!("starting api server on {}", api_addr);
 
         let result = tokio::spawn(async move {
-            api::serve_with_shutdown(api_store, &api_addr, api_start_time, api_config, api_config_path, Some(api_shutdown_tx), shutdown_signal(rx)).await
+            api::serve_with_shutdown(api_stores, &api_addr, api_start_time, api_config, api_config_path, Some(api_shutdown_tx), shutdown_signal(rx)).await
         })
         .await;
 
@@ -443,9 +443,12 @@ async fn main() {
         .map(|p| p.to_string())
         .unwrap_or_else(|| Config::default_path().to_string_lossy().to_string());
 
-    // 3. API server (supervised)
+    // 3. Wrap in OrgStoreManager (local mode = single store for all orgs)
+    let org_stores = Arc::new(api::OrgStoreManager::single(store.clone()));
+
+    // 4. API server (supervised)
     let api_handle = tokio::spawn(run_api_supervised(
-        store.clone(),
+        org_stores,
         resolved.api_addr.clone(),
         start_time,
         config_json,
@@ -588,13 +591,13 @@ async fn run_cloud_mode() {
     };
 
     // ── Trace storage ───────────────────────────────────────────────
-    let store = match cloud_config.storage_backend {
+    let org_stores: Arc<api::OrgStoreManager> = match cloud_config.storage_backend {
         cloud::StorageBackendType::Sqlite => {
             let db_path = std::env::var("DB_PATH")
                 .map(PathBuf::from)
                 .unwrap_or_else(|_| PathBuf::from("/tmp/traceway.db"));
 
-            info!(path = %db_path.display(), "Using SQLite storage");
+            info!(path = %db_path.display(), "Using SQLite storage (single store)");
 
             if let Some(parent) = db_path.parent() {
                 std::fs::create_dir_all(parent).ok();
@@ -608,16 +611,18 @@ async fn run_cloud_mode() {
                 }
             };
 
-            match PersistentStore::open(backend).await {
+            let store = match PersistentStore::open(backend).await {
                 Ok(p) => Arc::new(RwLock::new(p)),
                 Err(e) => {
                     error!("Failed to load data: {}", e);
                     std::process::exit(1);
                 }
-            }
+            };
+
+            Arc::new(api::OrgStoreManager::single(store))
         }
         cloud::StorageBackendType::Turbopuffer => {
-            info!("Using Turbopuffer storage");
+            info!("Using Turbopuffer storage (per-org namespaces)");
 
             let tp_config = match storage_turbopuffer::TurbopufferConfig::from_env() {
                 Ok(c) => c,
@@ -627,21 +632,7 @@ async fn run_cloud_mode() {
                 }
             };
 
-            let tp_backend = match storage_turbopuffer::TurbopufferBackend::new(tp_config) {
-                Ok(b) => AnyBackend::Turbopuffer(b),
-                Err(e) => {
-                    error!("Failed to create Turbopuffer backend: {}", e);
-                    std::process::exit(1);
-                }
-            };
-
-            match PersistentStore::open(tp_backend).await {
-                Ok(p) => Arc::new(RwLock::new(p)),
-                Err(e) => {
-                    error!("Failed to load data from Turbopuffer: {}", e);
-                    std::process::exit(1);
-                }
-            }
+            Arc::new(api::OrgStoreManager::per_org(tp_config))
         }
     };
 
@@ -677,12 +668,12 @@ async fn run_cloud_mode() {
 
     // ── Build and start the API server using RouterBuilder ───────────
     let api_handle = tokio::spawn({
-        let store = store.clone();
+        let org_stores = org_stores.clone();
         let shutdown_rx = shutdown_rx.clone();
         let shutdown_tx_clone = shutdown_tx.clone();
         let addr = addr.clone();
 
-        let mut builder = api::RouterBuilder::new(store.clone())
+        let mut builder = api::RouterBuilder::with_org_stores(org_stores)
             .start_time(start_time)
             .config(config_json)
             .config_path(String::new())
