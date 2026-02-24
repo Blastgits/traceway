@@ -408,6 +408,39 @@ impl<B: StorageBackend> PersistentStore<B> {
         count
     }
 
+    /// Delete all spans started before the given cutoff time.
+    /// Returns the number of spans deleted.
+    pub async fn delete_spans_before(&mut self, cutoff: chrono::DateTime<chrono::Utc>) -> usize {
+        let expired_ids: Vec<SpanId> = self.memory
+            .all_spans()
+            .filter(|s| s.started_at() < cutoff)
+            .map(|s| s.id())
+            .collect();
+
+        let count = expired_ids.len();
+        for id in expired_ids {
+            self.memory.delete_span(id);
+            if let Err(e) = self.backend.delete_span(id).await {
+                tracing::error!(%id, "failed to persist span deletion during retention cleanup: {}", e);
+            }
+        }
+
+        // Also clean up traces that now have zero spans
+        let empty_traces: Vec<TraceId> = self.trace_meta.keys()
+            .filter(|tid| self.memory.spans_for_trace(**tid).is_empty())
+            .cloned()
+            .collect();
+        for tid in empty_traces {
+            self.trace_meta.remove(&tid);
+            let _ = self.backend.delete_trace(tid).await;
+        }
+
+        if count > 0 {
+            tracing::info!(count, "retention cleanup: deleted expired spans");
+        }
+        count
+    }
+
     pub async fn clear(&mut self) {
         self.memory.clear();
         self.trace_meta.clear();
