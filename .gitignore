@@ -9,3 +9,5 @@ prds/
 .svelte-kit/
 
 build/
+
+__pycache__
