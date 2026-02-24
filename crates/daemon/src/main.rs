@@ -694,6 +694,13 @@ async fn run_cloud_mode() {
             }
         }
 
+        if let Ok(token) = std::env::var("POLAR_ACCESS_TOKEN") {
+            if !token.is_empty() {
+                info!("Polar checkout integration enabled");
+                builder = builder.polar_access_token(token);
+            }
+        }
+
         let app = builder.build();
 
         async move {

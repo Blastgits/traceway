@@ -224,6 +224,8 @@ pub struct AppState {
     pub app_url: String,
     /// Polar.sh webhook secret for signature verification (Standard Webhooks format)
     pub polar_webhook_secret: Option<String>,
+    /// Polar.sh access token for creating checkout sessions
+    pub polar_access_token: Option<String>,
 }
 
 impl AppState {
@@ -3118,6 +3120,7 @@ pub struct RouterBuilder {
     email_sender: Option<Arc<dyn auth::EmailSender>>,
     app_url: Option<String>,
     polar_webhook_secret: Option<String>,
+    polar_access_token: Option<String>,
 }
 
 impl RouterBuilder {
@@ -3135,6 +3138,7 @@ impl RouterBuilder {
             email_sender: None,
             app_url: None,
             polar_webhook_secret: None,
+            polar_access_token: None,
         }
     }
 
@@ -3152,6 +3156,7 @@ impl RouterBuilder {
             email_sender: None,
             app_url: None,
             polar_webhook_secret: None,
+            polar_access_token: None,
         }
     }
 
@@ -3167,6 +3172,7 @@ impl RouterBuilder {
     pub fn email_sender(mut self, e: Arc<dyn auth::EmailSender>) -> Self { self.email_sender = Some(e); self }
     pub fn app_url(mut self, u: String) -> Self { self.app_url = Some(u); self }
     pub fn polar_webhook_secret(mut self, s: String) -> Self { self.polar_webhook_secret = Some(s); self }
+    pub fn polar_access_token(mut self, s: String) -> Self { self.polar_access_token = Some(s); self }
 
     pub fn build(self) -> Router {
         build_router(
@@ -3181,6 +3187,7 @@ impl RouterBuilder {
             self.email_sender,
             self.app_url,
             self.polar_webhook_secret,
+            self.polar_access_token,
         )
     }
 }
@@ -3193,7 +3200,7 @@ pub fn router_with_start_time(
     shutdown_tx: Option<watch::Sender<bool>>,
 ) -> Router {
     let org_stores = Arc::new(OrgStoreManager::single(store));
-    build_router(org_stores, start_time, config, config_path, shutdown_tx, auth::AuthConfig::local(), None, None, None, None, None)
+    build_router(org_stores, start_time, config, config_path, shutdown_tx, auth::AuthConfig::local(), None, None, None, None, None, None)
 }
 
 fn build_router(
@@ -3208,6 +3215,7 @@ fn build_router(
     email_sender: Option<Arc<dyn auth::EmailSender>>,
     app_url: Option<String>,
     polar_webhook_secret: Option<String>,
+    polar_access_token: Option<String>,
 ) -> Router {
     let (events_tx, _) = broadcast::channel(256);
     let api_key_lookup = api_key_lookup.unwrap_or_else(|| {
@@ -3230,6 +3238,7 @@ fn build_router(
         email_sender,
         app_url,
         polar_webhook_secret,
+        polar_access_token,
     };
 
     // In cloud mode with a separate frontend origin, we need explicit origins
@@ -3321,6 +3330,8 @@ fn build_router(
         .route("/events", get(events))
         // Auth routes that require auth (me, org, api-keys)
         .merge(auth_routes::protected_auth_router())
+        // Billing routes that require auth (checkout)
+        .merge(billing_routes::billing_protected_router())
         .layer(AuthLayer { state: auth_mw_state });
 
     // Public routes (no auth required)
@@ -3418,7 +3429,7 @@ pub async fn serve_with_shutdown(
     shutdown_tx: Option<watch::Sender<bool>>,
     shutdown: impl std::future::Future<Output = ()> + Send + 'static,
 ) -> std::io::Result<()> {
-    let app = build_router(org_stores, start_time, config, config_path, shutdown_tx, auth::AuthConfig::local(), None, None, None, None, None);
+    let app = build_router(org_stores, start_time, config, config_path, shutdown_tx, auth::AuthConfig::local(), None, None, None, None, None, None);
     let listener = tokio::net::TcpListener::bind(addr).await?;
     tracing::info!("api listening on {}", addr);
     axum::serve(listener, app)
@@ -3426,6 +3437,3 @@ pub async fn serve_with_shutdown(
         .await
         .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
 }
-// test
-// test
-// test
