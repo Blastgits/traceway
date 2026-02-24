@@ -348,26 +348,32 @@ async fn create_checkout(
         (StatusCode::BAD_REQUEST, format!("Invalid plan: {}. Use 'pro' or 'team'.", req.plan))
     })?;
 
+    let auth_store = state.auth_store.as_ref().ok_or_else(|| {
+        (StatusCode::SERVICE_UNAVAILABLE, "Auth store not configured".into())
+    })?;
+
     // Get the user's email to pre-fill checkout
     let customer_email = if let Some(user_id) = ctx.user_id {
-        if let Some(auth_store) = state.auth_store.as_ref() {
-            auth_store.get_user(user_id).await
-                .ok()
-                .flatten()
-                .map(|u| u.email)
-        } else {
-            None
-        }
+        auth_store.get_user(user_id).await
+            .ok()
+            .flatten()
+            .map(|u| u.email)
     } else {
         None
     };
 
+    // Count current team members for seat-based pricing
+    let members = auth_store.list_users_for_org(ctx.org_id).await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to count members: {}", e)))?;
+    let seat_count = members.len().max(1); // At least 1 seat
+
     let success_url = format!("{}/settings/billing?checkout=success", state.app_url);
 
-    // Build Polar API request
+    // Build Polar API request (seat-based pricing)
     let mut body = serde_json::json!({
         "products": [product_id],
         "success_url": success_url,
+        "seats": seat_count,
         "metadata": {
             "org_id": ctx.org_id.to_string()
         }
