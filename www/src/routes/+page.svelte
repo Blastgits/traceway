@@ -450,15 +450,15 @@
 					cta: 'Get started', ctaStyle: 'border'
 				},
 				{
-					name: 'Pro', price: '$20', period: '/mo', highlight: true,
-					desc: 'For teams shipping AI to production.',
-					features: ['1M spans/month', '30-day retention', '5 team members', '5 API keys', 'Email support'],
-					cta: 'Start free trial', ctaStyle: 'accent'
-				},
-				{
-					name: 'Team', price: '$100', period: '/mo', highlight: false,
-					desc: 'For growing teams that need full observability.',
-					features: ['10M spans/month', '90-day retention', '50 team members', 'Unlimited API keys', 'Priority support'],
+				name: 'Pro', price: '$20', period: '/user/mo', highlight: true,
+				desc: 'For teams shipping AI to production.',
+				features: ['1M spans/month', '30-day retention', '5 team members', '5 API keys', 'Email support'],
+				cta: 'Start free trial', ctaStyle: 'accent'
+			},
+			{
+				name: 'Team', price: '$100', period: '/user/mo', highlight: false,
+				desc: 'For growing teams that need full observability.',
+				features: ['10M spans/month', '90-day retention', '50 team members', 'Unlimited API keys', 'Priority support'],
 					cta: 'Get started', ctaStyle: 'border'
 				},
 			] as plan, i}
