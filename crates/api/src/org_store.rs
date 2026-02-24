@@ -106,4 +106,16 @@ impl OrgStoreManager {
     pub fn is_per_org(&self) -> bool {
         matches!(self.mode, StoreMode::PerOrg { .. })
     }
+
+    /// List all currently-cached org IDs and their stores.
+    /// In single mode, returns an empty vec (no org-specific cleanup needed).
+    pub async fn cached_stores(&self) -> Vec<(OrgId, SharedStore)> {
+        match &self.mode {
+            StoreMode::Single(_) => vec![],
+            StoreMode::PerOrg { stores, .. } => {
+                let cache = stores.read().await;
+                cache.iter().map(|(id, s)| (*id, s.clone())).collect()
+            }
+        }
+    }
 }

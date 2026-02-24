@@ -683,8 +683,8 @@ async fn run_cloud_mode() {
             .email_sender(email_sender)
             .app_url(app_url);
 
-        if let Some(s) = auth_store {
-            builder = builder.auth_store(s);
+        if let Some(ref s) = auth_store {
+            builder = builder.auth_store(s.clone());
         }
 
         if let Ok(secret) = std::env::var("POLAR_WEBHOOK_SECRET") {
@@ -705,6 +705,18 @@ async fn run_cloud_mode() {
                 .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
         }
     });
+
+    // ── Retention cleanup background task ─────────────────────────────
+    let retention_handle = if let Some(ref store) = auth_store {
+        info!("Starting retention cleanup background task");
+        Some(tokio::spawn(api::run_retention_cleanup(
+            org_stores.clone(),
+            store.clone(),
+            shutdown_rx.clone(),
+        )))
+    } else {
+        None
+    };
 
     info!("Cloud daemon ready on http://{}", addr);
 
@@ -732,12 +744,15 @@ async fn run_cloud_mode() {
     info!("Initiating graceful shutdown");
     let _ = shutdown_tx.send(true);
 
-    let shutdown_result = tokio::time::timeout(SHUTDOWN_TIMEOUT, api_handle).await;
+    let shutdown_result = tokio::time::timeout(SHUTDOWN_TIMEOUT, async {
+        let _ = api_handle.await;
+        if let Some(h) = retention_handle {
+            let _ = h.await;
+        }
+    }).await;
 
     match shutdown_result {
-        Ok(Ok(Ok(()))) => info!("API server stopped gracefully"),
-        Ok(Ok(Err(e))) => error!("API server error: {}", e),
-        Ok(Err(e)) => error!("API server panicked: {}", e),
+        Ok(()) => info!("All components stopped gracefully"),
         Err(_) => warn!("Shutdown timed out"),
     }
 

@@ -588,6 +588,21 @@ async fn create_invite(
         return Err((StatusCode::CONFLICT, "User already exists".into()));
     }
 
+    // Enforce team member limit per plan
+    let org = auth_store.get_org(ctx.org_id).await.map_err(internal_err)?
+        .ok_or_else(|| (StatusCode::NOT_FOUND, "Organization not found".into()))?;
+    let max_members = org.plan.max_team_members();
+    let current_members = auth_store.list_users_for_org(ctx.org_id).await.map_err(internal_err)?;
+    let pending_invites = auth_store.list_invites_for_org(ctx.org_id).await.map_err(internal_err)?;
+    let active_invites = pending_invites.iter().filter(|i| i.expires_at > Utc::now()).count();
+    let total = current_members.len() + active_invites;
+    if total >= max_members {
+        return Err((
+            StatusCode::FORBIDDEN,
+            format!("Team member limit reached ({max_members}). Upgrade your plan for more."),
+        ));
+    }
+
     // Generate invite token
     let (token, token_hash) = generate_token();
 

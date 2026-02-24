@@ -28,7 +28,7 @@ use axum::{
 };
 use axum_extra::extract::Multipart;
 use rust_embed::Embed;
-use chrono::{DateTime, Utc};
+use chrono::{Datelike, DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::{OpenApi, ToSchema};
 use tokio::sync::{broadcast, watch, RwLock};
@@ -783,7 +783,19 @@ async fn create_span(
                 let limit = org.plan.spans_per_month();
                 let store = state.store_for_org(ctx.org_id).await.map_err(store_err_json)?;
                 let r = store.read().await;
-                let current_count = r.span_count() as u64;
+                // Count spans created since the start of the current calendar month
+                let now = Utc::now();
+                let month_start = now.date_naive()
+                    .with_day(1)
+                    .unwrap_or(now.date_naive());
+                let month_start_dt = month_start.and_hms_opt(0, 0, 0)
+                    .unwrap()
+                    .and_utc();
+                let monthly_filter = SpanFilter {
+                    since: Some(month_start_dt),
+                    ..Default::default()
+                };
+                let current_count = r.filter_spans(&monthly_filter).len() as u64;
                 drop(r);
                 if current_count >= limit {
                     return Err((StatusCode::TOO_MANY_REQUESTS, Json(serde_json::json!({
@@ -3342,6 +3354,54 @@ fn build_router(
 
     app.layer(cors)
         .with_state(state)
+}
+
+/// Background retention cleanup task.
+/// Runs every hour (or until shutdown), deleting spans older than the org's retention window.
+/// In per-org (cloud) mode, iterates all cached org stores and checks each org's plan.
+/// Should be spawned as `tokio::spawn(run_retention_cleanup(...))`.
+pub async fn run_retention_cleanup(
+    org_stores: Arc<OrgStoreManager>,
+    auth_store: Arc<dyn auth::AuthStore>,
+    mut shutdown_rx: watch::Receiver<bool>,
+) {
+    use chrono::{Duration, Utc};
+    use std::time::Duration as StdDuration;
+
+    let interval = StdDuration::from_secs(60 * 60); // 1 hour
+
+    loop {
+        tokio::select! {
+            _ = tokio::time::sleep(interval) => {}
+            _ = shutdown_rx.changed() => {
+                tracing::info!("retention cleanup: shutting down");
+                return;
+            }
+        }
+
+        tracing::debug!("retention cleanup: starting sweep");
+
+        let cached = org_stores.cached_stores().await;
+        for (org_id, store) in cached {
+            let retention_days = match auth_store.get_org(org_id).await {
+                Ok(Some(org)) => org.plan.retention_days(),
+                _ => {
+                    tracing::warn!(%org_id, "retention cleanup: could not fetch org, skipping");
+                    continue;
+                }
+            };
+
+            let cutoff = Utc::now() - Duration::days(retention_days as i64);
+            let mut w = store.write().await;
+            let deleted = w.delete_spans_before(cutoff).await;
+            drop(w);
+            if deleted > 0 {
+                tracing::info!(%org_id, deleted, retention_days, "retention cleanup: cleaned org");
+            }
+        }
+
+        tracing::debug!("retention cleanup: sweep complete");
+    }
 }
 
 pub async fn serve(store: SharedStore, addr: &str) -> std::io::Result<()> {
