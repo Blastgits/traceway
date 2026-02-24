@@ -26,7 +26,7 @@ COPY crates ./crates
 COPY --from=ui-builder /app/ui/build ./ui/build
 
 # Build release binary with cloud features
-RUN cargo build --release -p daemon --features cloud
+RUN cargo build --release -p traceway --features cloud
 
 # Runtime stage
 FROM debian:bookworm-slim
@@ -39,7 +39,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy binary from builder
-COPY --from=builder /app/target/release/daemon /usr/local/bin/traceway
+COPY --from=builder /app/target/release/traceway /usr/local/bin/traceway
 
 # Create non-root user
 RUN useradd -r -s /bin/false traceway
