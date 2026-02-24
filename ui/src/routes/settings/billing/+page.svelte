@@ -1,10 +1,11 @@
 <script lang="ts">
-	import { getOrg, type OrgInfo } from '$lib/api';
+	import { getOrg, type OrgInfo, API_BASE } from '$lib/api';
 	import { onMount } from 'svelte';
 
 	let org: OrgInfo | null = $state(null);
 	let loading = $state(true);
 	let error = $state('');
+	let checkoutLoading = $state('');
 
 	// Plan display info
 	const plans = [
@@ -13,9 +14,6 @@
 			name: 'Free',
 			price: '$0',
 			period: '/mo',
-			spans: '10,000',
-			retention: '7 days',
-			members: '1',
 			features: ['10K spans/month', '7-day retention', '1 team member', '1 API key', 'Community support'],
 		},
 		{
@@ -23,9 +21,6 @@
 			name: 'Pro',
 			price: '$20',
 			period: '/mo',
-			spans: '1,000,000',
-			retention: '30 days',
-			members: '5',
 			features: ['1M spans/month', '30-day retention', '5 team members', '5 API keys', 'Email support'],
 		},
 		{
@@ -33,9 +28,6 @@
 			name: 'Team',
 			price: '$100',
 			period: '/mo',
-			spans: '10,000,000',
-			retention: '90 days',
-			members: '50',
 			features: ['10M spans/month', '90-day retention', '50 team members', 'Unlimited API keys', 'Priority support'],
 		},
 	];
@@ -47,6 +39,33 @@
 		return n.toString();
 	}
 
+	async function startCheckout(plan: string) {
+		checkoutLoading = plan;
+		error = '';
+		try {
+			const res = await fetch(`${API_BASE}/billing/checkout`, {
+				method: 'POST',
+				credentials: 'include',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ plan })
+			});
+			if (!res.ok) {
+				const text = await res.text();
+				throw new Error(text || `Failed to create checkout (${res.status})`);
+			}
+			const data = await res.json();
+			if (data.url) {
+				window.location.href = data.url;
+			} else {
+				throw new Error('No checkout URL returned');
+			}
+		} catch (e: any) {
+			error = e.message || 'Failed to start checkout';
+		} finally {
+			checkoutLoading = '';
+		}
+	}
+
 	onMount(async () => {
 		try {
 			org = await getOrg();
@@ -54,6 +73,15 @@
 			error = 'Failed to load organization info';
 		}
 		loading = false;
+
+		// Show success message if returning from checkout
+		const params = new URLSearchParams(window.location.search);
+		if (params.get('checkout') === 'success') {
+			// Refresh org data to get updated plan
+			setTimeout(async () => {
+				try { org = await getOrg(); } catch {}
+			}, 2000);
+		}
 	});
 </script>
 
@@ -129,22 +157,34 @@
 							<!-- No action for free if they're on a paid plan -->
 						</div>
 					{:else}
-						<a
-							href="https://polar.sh/traceway/checkout?product={plan.name}&metadata[org_id]={org.id}"
-							target="_blank"
-							rel="noopener noreferrer"
-							class="block text-center px-4 py-2 text-sm bg-accent text-bg font-semibold rounded hover:bg-accent/80 transition-colors"
+						<button
+							onclick={() => startCheckout(plan.id)}
+							disabled={!!checkoutLoading}
+							class="block w-full text-center px-4 py-2 text-sm bg-accent text-bg font-semibold rounded hover:bg-accent/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
 						>
-							Upgrade to {plan.name}
-						</a>
+							{checkoutLoading === plan.id ? 'Redirecting...' : `Upgrade to ${plan.name}`}
+						</button>
 					{/if}
 				</div>
 			{/each}
 		</div>
 
+		<!-- Enterprise -->
+		<div class="bg-bg-secondary border border-border rounded p-4 flex items-center justify-between">
+			<div>
+				<div class="text-sm font-semibold text-text">Enterprise</div>
+				<div class="text-xs text-text-muted mt-0.5">Unlimited spans, 365-day retention, SSO, dedicated support</div>
+			</div>
+			<a
+				href="mailto:andrew@traceway.ai"
+				class="px-4 py-2 text-sm border border-accent text-accent font-semibold rounded hover:bg-accent/10 transition-colors"
+			>
+				Contact us
+			</a>
+		</div>
+
 		<p class="text-xs text-text-muted">
 			Plans are billed monthly via <a href="https://polar.sh" target="_blank" rel="noopener noreferrer" class="text-accent hover:underline">Polar</a>.
-			Need an enterprise plan? <a href="mailto:support@traceway.ai" class="text-accent hover:underline">Contact us</a>.
 		</p>
 	{/if}
 </div>

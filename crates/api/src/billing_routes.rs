@@ -17,10 +17,11 @@ use axum::{
     extract::State,
     http::{HeaderMap, StatusCode},
     routing::post,
-    Router,
+    Json, Router,
 };
 use base64::Engine;
 use hmac::{Hmac, Mac};
+use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 
 use crate::AppState;
@@ -311,9 +312,117 @@ async fn handle_polar_webhook(
     Ok(StatusCode::OK)
 }
 
-// ── Router ──
+// ── Checkout session creation ──
+
+/// Product IDs for Polar checkout (loaded from env or hardcoded).
+fn polar_product_id(plan: &str) -> Option<&'static str> {
+    match plan {
+        "pro" => Some("02a58cb6-1853-4179-ba29-6d65c71836db"),
+        "team" => Some("507c5aeb-b4a2-47e4-870b-ea6b89814a9f"),
+        _ => None,
+    }
+}
+
+#[derive(Deserialize)]
+struct CheckoutRequest {
+    plan: String,
+}
+
+#[derive(Serialize)]
+struct CheckoutResponse {
+    url: String,
+}
+
+/// Create a Polar checkout session for the authenticated user's org.
+/// POST /api/billing/checkout { "plan": "pro" | "team" }
+async fn create_checkout(
+    State(state): State<AppState>,
+    auth::Auth(ctx): auth::Auth,
+    Json(req): Json<CheckoutRequest>,
+) -> Result<Json<CheckoutResponse>, (StatusCode, String)> {
+    let polar_token = state.polar_access_token.as_ref().ok_or_else(|| {
+        (StatusCode::SERVICE_UNAVAILABLE, "Billing not configured".into())
+    })?;
+
+    let product_id = polar_product_id(&req.plan).ok_or_else(|| {
+        (StatusCode::BAD_REQUEST, format!("Invalid plan: {}. Use 'pro' or 'team'.", req.plan))
+    })?;
+
+    // Get the user's email to pre-fill checkout
+    let customer_email = if let Some(user_id) = ctx.user_id {
+        if let Some(auth_store) = state.auth_store.as_ref() {
+            auth_store.get_user(user_id).await
+                .ok()
+                .flatten()
+                .map(|u| u.email)
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    let success_url = format!("{}/settings/billing?checkout=success", state.app_url);
+
+    // Build Polar API request
+    let mut body = serde_json::json!({
+        "products": [product_id],
+        "success_url": success_url,
+        "metadata": {
+            "org_id": ctx.org_id.to_string()
+        }
+    });
+
+    if let Some(email) = customer_email {
+        body["customer_email"] = serde_json::Value::String(email);
+    }
+
+    let client = reqwest::Client::new();
+    let resp = client
+        .post("https://api.polar.sh/v1/checkouts/")
+        .header("Authorization", format!("Bearer {}", polar_token))
+        .header("Content-Type", "application/json")
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| {
+            tracing::error!("Polar checkout API error: {}", e);
+            (StatusCode::BAD_GATEWAY, format!("Failed to create checkout: {}", e))
+        })?;
+
+    if !resp.status().is_success() {
+        let status = resp.status();
+        let body_text = resp.text().await.unwrap_or_default();
+        tracing::error!("Polar checkout API returned {}: {}", status, body_text);
+        return Err((StatusCode::BAD_GATEWAY, format!("Polar API error ({}): {}", status, body_text)));
+    }
+
+    let checkout: serde_json::Value = resp.json().await.map_err(|e| {
+        (StatusCode::BAD_GATEWAY, format!("Failed to parse Polar response: {}", e))
+    })?;
+
+    let url = checkout["url"].as_str().ok_or_else(|| {
+        tracing::error!("Polar checkout response missing 'url': {:?}", checkout);
+        (StatusCode::BAD_GATEWAY, "Polar response missing checkout URL".into())
+    })?;
+
+    tracing::info!(
+        org_id = %ctx.org_id,
+        plan = %req.plan,
+        "Created Polar checkout session"
+    );
+
+    Ok(Json(CheckoutResponse { url: url.to_string() }))
+}
+
+// ── Routers ──
 
 /// Public billing routes (no auth required — Polar calls these).
 pub fn billing_router() -> Router<AppState> {
     Router::new().route("/billing/polar/webhook", post(handle_polar_webhook))
+}
+
+/// Protected billing routes (auth required).
+pub fn billing_protected_router() -> Router<AppState> {
+    Router::new().route("/billing/checkout", post(create_checkout))
 }
