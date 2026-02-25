@@ -325,28 +325,116 @@
 		return groups;
 	});
 
-	// ─── Scatter data ──────────────────────────────────────────────────
+	// ─── Performance insights data ─────────────────────────────────────
 
-	const scatterData = $derived.by(() => {
-		if (results.length === 0) return { points: [], xMin: 0, xMax: 1, yMax: 1 };
-		const points = results.map(s => ({
-			span: s,
-			x: new Date(spanStartedAt(s)).getTime(),
-			y: spanDurationMs(s) ?? 0,
-			tokens: s.kind?.type === 'llm_call' ? ((s.kind.input_tokens ?? 0) + (s.kind.output_tokens ?? 0)) : 0,
-			status: spanStatus(s),
-		})).filter(p => p.y > 0);
+	// Color palette for models/kinds
+	const MODEL_COLORS = [
+		'#6ee7b7', '#a78bfa', '#f9a8d4', '#fbbf24', '#67e8f9',
+		'#fb923c', '#86efac', '#c4b5fd', '#fda4af', '#fde68a',
+	];
 
-		if (points.length === 0) return { points: [], xMin: 0, xMax: 1, yMax: 1 };
+	interface ScatterPoint {
+		span: Span;
+		x: number;       // timestamp
+		y: number;       // duration ms
+		logY: number;    // log-scaled Y position (0-1)
+		tokens: number;
+		status: string;
+		colorLabel: string;  // model name or kind for coloring
+		colorIdx: number;
+	}
 
-		const xMin = Math.min(...points.map(p => p.x));
-		const xMax = Math.max(...points.map(p => p.x));
-		const yMax = Math.max(...points.map(p => p.y));
-		return { points, xMin, xMax: xMax === xMin ? xMin + 1 : xMax, yMax: yMax || 1 };
+	const insightsData = $derived.by(() => {
+		const empty = { points: [] as ScatterPoint[], xMin: 0, xMax: 1, yMin: 1, yMax: 1, logYMin: 0, logYMax: 1, p50: 0, p95: 0, p99: 0, colorLabels: [] as string[], totalTokens: 0, totalCost: 0, avgDuration: 0, failedCount: 0 };
+		if (results.length === 0) return empty;
+
+		// Build color label index (model for LLM calls, kind for others)
+		const labelSet = new Set<string>();
+		for (const s of results) {
+			if (s.kind?.type === 'llm_call' && s.kind.model) labelSet.add(s.kind.model);
+			else labelSet.add(spanKindLabel(s));
+		}
+		const colorLabels = [...labelSet];
+		const labelToIdx = new Map<string, number>();
+		colorLabels.forEach((l, i) => labelToIdx.set(l, i));
+
+		// Aggregate stats
+		let totalTokens = 0;
+		let totalCost = 0;
+		let failedCount = 0;
+		const durations: number[] = [];
+
+		const raw = results.map(s => {
+			const dur = spanDurationMs(s) ?? 0;
+			const tokens = s.kind?.type === 'llm_call' ? ((s.kind.input_tokens ?? 0) + (s.kind.output_tokens ?? 0)) : 0;
+			const status = spanStatus(s);
+			if (s.kind?.type === 'llm_call') {
+				totalTokens += tokens;
+				totalCost += s.kind.cost ?? 0;
+			}
+			if (status === 'failed') failedCount++;
+			if (dur > 0) durations.push(dur);
+
+			const label = (s.kind?.type === 'llm_call' && s.kind.model) ? s.kind.model : spanKindLabel(s);
+			return {
+				span: s,
+				x: new Date(spanStartedAt(s)).getTime(),
+				y: dur,
+				logY: 0,
+				tokens,
+				status,
+				colorLabel: label,
+				colorIdx: labelToIdx.get(label) ?? 0,
+			};
+		}).filter(p => p.y > 0);
+
+		if (raw.length === 0) return empty;
+
+		// Percentiles from durations
+		durations.sort((a, b) => a - b);
+		const percentile = (arr: number[], p: number) => arr[Math.min(Math.floor(arr.length * p), arr.length - 1)];
+		const p50 = percentile(durations, 0.5);
+		const p95 = percentile(durations, 0.95);
+		const p99 = percentile(durations, 0.99);
+		const avgDuration = durations.reduce((a, b) => a + b, 0) / durations.length;
+
+		// Log scale Y mapping
+		const yMin = Math.max(1, Math.min(...raw.map(p => p.y)));
+		const yMax = Math.max(...raw.map(p => p.y));
+		const logMin = Math.log10(yMin);
+		const logMax = Math.log10(yMax);
+		const logRange = logMax - logMin || 1;
+
+		for (const p of raw) {
+			p.logY = (Math.log10(Math.max(1, p.y)) - logMin) / logRange;
+		}
+
+		const xMin = Math.min(...raw.map(p => p.x));
+		const xMax = Math.max(...raw.map(p => p.x));
+
+		return {
+			points: raw,
+			xMin,
+			xMax: xMax === xMin ? xMin + 1 : xMax,
+			yMin,
+			yMax,
+			logYMin: logMin,
+			logYMax: logMax,
+			p50, p95, p99,
+			colorLabels,
+			totalTokens,
+			totalCost,
+			avgDuration: Math.round(avgDuration),
+			failedCount,
+		};
 	});
 
-	let scatterHovered: typeof scatterData.points[number] | null = $state(null);
-	let scatterContainerEl: HTMLDivElement | undefined = $state(undefined);
+	function percentileLogY(ms: number): number {
+		if (insightsData.logYMax === insightsData.logYMin) return 0.5;
+		return (Math.log10(Math.max(1, ms)) - insightsData.logYMin) / (insightsData.logYMax - insightsData.logYMin);
+	}
+
+	let hoveredPoint: ScatterPoint | null = $state(null);
 
 	// ─── URL state ──────────────────────────────────────────────────────
 
@@ -714,7 +802,7 @@
 						<button
 							class="px-2 py-1 rounded transition-colors {viewMode === 'scatter' ? 'bg-accent/20 text-accent' : 'text-text-muted hover:text-text'}"
 							onclick={() => { viewMode = 'scatter'; writeUrlState(); }}
-							title="Duration scatter plot"
+							title="Performance insights"
 						>
 							<svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z" /></svg>
 						</button>
@@ -880,119 +968,185 @@
 				</div>
 
 			{:else if viewMode === 'scatter'}
-				<!-- Scatter plot: time vs duration -->
-				<div class="border border-border rounded-lg overflow-hidden bg-bg-secondary">
-					<div class="px-4 py-2 border-b border-border flex items-center justify-between">
-						<span class="text-xs text-text-muted uppercase tracking-wider">Duration over time</span>
-						<span class="text-[10px] text-text-muted">Bubble size = token count &middot; Click to view trace</span>
+				<!-- Performance insights view -->
+				<div class="space-y-3">
+					<!-- Summary stat cards -->
+					<div class="grid grid-cols-2 md:grid-cols-5 gap-2">
+						<div class="bg-bg-secondary border border-border rounded-lg px-3 py-2.5">
+							<div class="text-[10px] text-text-muted uppercase tracking-wider mb-1">Avg latency</div>
+							<div class="text-lg font-mono font-semibold text-text">{formatDuration(insightsData.avgDuration)}</div>
+						</div>
+						<div class="bg-bg-secondary border border-border rounded-lg px-3 py-2.5">
+							<div class="text-[10px] text-text-muted uppercase tracking-wider mb-1">P95 latency</div>
+							<div class="text-lg font-mono font-semibold text-warning">{formatDuration(insightsData.p95)}</div>
+						</div>
+						<div class="bg-bg-secondary border border-border rounded-lg px-3 py-2.5">
+							<div class="text-[10px] text-text-muted uppercase tracking-wider mb-1">Total tokens</div>
+							<div class="text-lg font-mono font-semibold text-text">{insightsData.totalTokens.toLocaleString()}</div>
+						</div>
+						<div class="bg-bg-secondary border border-border rounded-lg px-3 py-2.5">
+							<div class="text-[10px] text-text-muted uppercase tracking-wider mb-1">Total cost</div>
+							<div class="text-lg font-mono font-semibold text-success">{formatCostNum(insightsData.totalCost)}</div>
+						</div>
+						<div class="bg-bg-secondary border border-border rounded-lg px-3 py-2.5">
+							<div class="text-[10px] text-text-muted uppercase tracking-wider mb-1">Errors</div>
+							<div class="text-lg font-mono font-semibold {insightsData.failedCount > 0 ? 'text-danger' : 'text-text'}">{insightsData.failedCount}</div>
+						</div>
 					</div>
 
-					{#if scatterData.points.length === 0}
-						<div class="flex items-center justify-center h-64 text-text-muted text-sm">
-							No spans with measurable duration
-						</div>
-					{:else}
-						<div
-							bind:this={scatterContainerEl}
-							class="relative h-80 mx-4 my-4"
-						>
-							<!-- Y axis labels -->
-							<div class="absolute left-0 top-0 bottom-6 w-14 flex flex-col justify-between text-[10px] text-text-muted font-mono text-right pr-2">
-								<span>{formatDuration(scatterData.yMax)}</span>
-								<span>{formatDuration(scatterData.yMax / 2)}</span>
-								<span>0</span>
-							</div>
-
-							<!-- Plot area -->
-							<div class="absolute left-16 right-0 top-0 bottom-6 border-l border-b border-border/50">
-								<!-- Grid lines -->
-								<div class="absolute inset-0">
-									<div class="absolute left-0 right-0 top-1/4 border-t border-border/20"></div>
-									<div class="absolute left-0 right-0 top-1/2 border-t border-border/20"></div>
-									<div class="absolute left-0 right-0 top-3/4 border-t border-border/20"></div>
-								</div>
-
-								<!-- Points -->
-								{#each scatterData.points as point}
-									{@const xPct = ((point.x - scatterData.xMin) / (scatterData.xMax - scatterData.xMin)) * 100}
-									{@const yPct = (1 - point.y / scatterData.yMax) * 100}
-									{@const size = Math.max(6, Math.min(24, Math.sqrt(point.tokens / 10) + 4))}
-									<button
-										class="absolute rounded-full transition-all hover:ring-2 hover:ring-accent/50
-											{point.status === 'failed' ? 'bg-danger/70' : point.status === 'running' ? 'bg-warning/70' : 'bg-accent/60'}"
-										style="left: {xPct}%; top: {yPct}%; width: {size}px; height: {size}px; transform: translate(-50%, -50%)"
-										onclick={() => goto(`/traces/${point.span.trace_id}`)}
-										onmouseenter={() => scatterHovered = point}
-										onmouseleave={() => scatterHovered = null}
-									></button>
+					<!-- Scatter chart -->
+					<div class="border border-border rounded-lg overflow-hidden bg-bg-secondary">
+						<div class="px-4 py-2 border-b border-border flex items-center justify-between">
+							<span class="text-xs text-text-muted uppercase tracking-wider">Latency distribution</span>
+							<div class="flex items-center gap-3">
+								<!-- Legend -->
+								{#each insightsData.colorLabels.slice(0, 6) as label, i}
+									<span class="inline-flex items-center gap-1 text-[10px] text-text-muted">
+										<span class="w-2 h-2 rounded-full shrink-0" style="background: {MODEL_COLORS[i % MODEL_COLORS.length]}"></span>
+										{label}
+									</span>
 								{/each}
-
-								<!-- Hover tooltip -->
-								{#if scatterHovered}
-									{@const xPct = ((scatterHovered.x - scatterData.xMin) / (scatterData.xMax - scatterData.xMin)) * 100}
-									{@const yPct = (1 - scatterHovered.y / scatterData.yMax) * 100}
-									<div
-										class="absolute z-10 bg-bg-tertiary border border-border rounded-lg px-3 py-2 shadow-lg pointer-events-none text-xs space-y-0.5 min-w-[180px]"
-										style="left: {Math.min(xPct, 75)}%; top: {Math.max(yPct - 10, 5)}%; transform: translateX(-50%)"
-									>
-										<div class="font-mono text-text font-medium truncate">{scatterHovered.span.name}</div>
-										<div class="flex items-center gap-2 text-text-muted">
-											<span>{formatDuration(scatterHovered.y)}</span>
-											{#if scatterHovered.tokens > 0}
-												<span>&middot; {scatterHovered.tokens.toLocaleString()} tok</span>
-											{/if}
-										</div>
-										{#if scatterHovered.span.kind?.type === 'llm_call'}
-											<div class="text-purple-400">{scatterHovered.span.kind.model}</div>
-										{/if}
-										<div class="text-text-muted/60">{formatDateTime(spanStartedAt(scatterHovered.span))}</div>
-									</div>
+								{#if insightsData.colorLabels.length > 6}
+									<span class="text-[10px] text-text-muted">+{insightsData.colorLabels.length - 6} more</span>
 								{/if}
 							</div>
+						</div>
 
-							<!-- X axis labels -->
-							<div class="absolute left-16 right-0 bottom-0 h-5 flex justify-between text-[10px] text-text-muted font-mono">
-								<span>{formatDateTime(new Date(scatterData.xMin).toISOString())}</span>
-								<span>{formatDateTime(new Date(scatterData.xMax).toISOString())}</span>
+						{#if insightsData.points.length === 0}
+							<div class="flex items-center justify-center h-64 text-text-muted text-sm">
+								No spans with measurable duration
 							</div>
+						{:else}
+							<div class="relative h-72 mx-4 mt-3 mb-6">
+								<!-- Y axis labels (log scale) -->
+								<div class="absolute left-0 top-0 bottom-6 w-14 flex flex-col justify-between text-[10px] text-text-muted font-mono text-right pr-2">
+									<span>{formatDuration(insightsData.yMax)}</span>
+									<span>{formatDuration(Math.pow(10, (insightsData.logYMin + insightsData.logYMax) / 2))}</span>
+									<span>{formatDuration(insightsData.yMin)}</span>
+								</div>
+
+								<!-- Plot area -->
+								<div class="absolute left-16 right-0 top-0 bottom-6 border-l border-b border-border/50 overflow-hidden">
+									<!-- Percentile reference lines -->
+									<div class="absolute left-0 right-0 border-t border-dashed border-text-muted/20" style="top: {(1 - percentileLogY(insightsData.p50)) * 100}%">
+										<span class="absolute -top-2.5 right-1 text-[9px] text-text-muted/40 font-mono">p50 {formatDuration(insightsData.p50)}</span>
+									</div>
+									<div class="absolute left-0 right-0 border-t border-dashed border-warning/30" style="top: {(1 - percentileLogY(insightsData.p95)) * 100}%">
+										<span class="absolute -top-2.5 right-1 text-[9px] text-warning/50 font-mono">p95 {formatDuration(insightsData.p95)}</span>
+									</div>
+									{#if insightsData.p99 !== insightsData.p95}
+										<div class="absolute left-0 right-0 border-t border-dashed border-danger/30" style="top: {(1 - percentileLogY(insightsData.p99)) * 100}%">
+											<span class="absolute -top-2.5 right-1 text-[9px] text-danger/50 font-mono">p99 {formatDuration(insightsData.p99)}</span>
+										</div>
+									{/if}
+
+									<!-- Points -->
+									{#each insightsData.points as point}
+										{@const xPct = ((point.x - insightsData.xMin) / (insightsData.xMax - insightsData.xMin)) * 100}
+										{@const yPct = (1 - point.logY) * 100}
+										{@const size = Math.max(5, Math.min(20, Math.sqrt(point.tokens / 20) + 4))}
+										{@const color = point.status === 'failed' ? '#ef4444' : MODEL_COLORS[point.colorIdx % MODEL_COLORS.length]}
+										<button
+											class="absolute rounded-full transition-all duration-100 hover:ring-2 hover:ring-white/30 hover:z-10"
+											style="left: {xPct}%; top: {yPct}%; width: {size}px; height: {size}px; transform: translate(-50%, -50%); background: {color}; opacity: {hoveredPoint && hoveredPoint !== point ? 0.25 : 0.75}"
+											onclick={() => goto(`/traces/${point.span.trace_id}`)}
+											onmouseenter={() => hoveredPoint = point}
+											onmouseleave={() => hoveredPoint = null}
+										></button>
+									{/each}
+
+									<!-- Hover tooltip -->
+									{#if hoveredPoint}
+										{@const xPct = ((hoveredPoint.x - insightsData.xMin) / (insightsData.xMax - insightsData.xMin)) * 100}
+										{@const yPct = (1 - hoveredPoint.logY) * 100}
+										{@const color = hoveredPoint.status === 'failed' ? '#ef4444' : MODEL_COLORS[hoveredPoint.colorIdx % MODEL_COLORS.length]}
+										<div
+											class="absolute z-20 bg-bg-tertiary border border-border rounded-lg px-3 py-2 shadow-xl pointer-events-none text-xs space-y-1 min-w-[200px]"
+											style="left: {Math.min(Math.max(xPct, 15), 85)}%; top: {yPct < 30 ? yPct + 5 : yPct - 25}%; transform: translateX(-50%)"
+										>
+											<div class="flex items-center gap-2">
+												<span class="w-2 h-2 rounded-full shrink-0" style="background: {color}"></span>
+												<span class="font-mono text-text font-medium truncate">{hoveredPoint.span.name}</span>
+											</div>
+											<div class="grid grid-cols-2 gap-x-4 gap-y-0.5 text-text-muted">
+												<span>Duration</span>
+												<span class="text-text font-mono text-right">{formatDuration(hoveredPoint.y)}</span>
+												{#if hoveredPoint.tokens > 0}
+													<span>Tokens</span>
+													<span class="text-text font-mono text-right">{hoveredPoint.tokens.toLocaleString()}</span>
+												{/if}
+												{#if hoveredPoint.span.kind?.type === 'llm_call' && hoveredPoint.span.kind.cost}
+													<span>Cost</span>
+													<span class="text-success font-mono text-right">{formatCost(hoveredPoint.span)}</span>
+												{/if}
+												{#if hoveredPoint.span.kind?.type === 'llm_call'}
+													<span>Model</span>
+													<span class="text-text font-mono text-right">{hoveredPoint.span.kind.model}</span>
+												{/if}
+											</div>
+											<div class="text-text-muted/50 text-[10px]">{formatDateTime(spanStartedAt(hoveredPoint.span))}</div>
+										</div>
+									{/if}
+								</div>
+
+								<!-- X axis labels -->
+								<div class="absolute left-16 right-0 bottom-0 h-5 flex justify-between text-[10px] text-text-muted font-mono">
+									<span>{formatDateTime(new Date(insightsData.xMin).toISOString())}</span>
+									{#if insightsData.points.length > 2}
+										{@const midTime = insightsData.xMin + (insightsData.xMax - insightsData.xMin) / 2}
+										<span>{formatDateTime(new Date(midTime).toISOString())}</span>
+									{/if}
+									<span>{formatDateTime(new Date(insightsData.xMax).toISOString())}</span>
+								</div>
+
+								<!-- Y axis title -->
+								<div class="absolute -left-1 top-1/2 -translate-y-1/2 -rotate-90 text-[9px] text-text-muted/40 uppercase tracking-widest whitespace-nowrap">Duration (log)</div>
+							</div>
+						{/if}
+					</div>
+
+					<!-- Outliers table (only show top slowest spans) -->
+					{#if insightsData.points.length > 0}
+						{@const slowest = [...results].filter(s => spanDurationMs(s) !== null).sort((a, b) => (spanDurationMs(b) ?? 0) - (spanDurationMs(a) ?? 0)).slice(0, 20)}
+						<div class="border border-border rounded-lg overflow-hidden">
+							<div class="px-3 py-2 bg-bg-secondary border-b border-border text-[11px] text-text-muted uppercase tracking-wider">
+								Slowest spans
+							</div>
+							<table class="w-full text-sm">
+								<thead>
+									<tr class="text-left text-[11px] text-text-muted border-b border-border bg-bg-secondary/50 uppercase tracking-wider">
+										<th class="px-3 py-1.5 font-medium">Name</th>
+										<th class="px-3 py-1.5 font-medium">Model</th>
+										<th class="px-3 py-1.5 font-medium">Status</th>
+										<th class="px-3 py-1.5 font-medium text-right">Tokens</th>
+										<th class="px-3 py-1.5 font-medium text-right">Cost</th>
+										<th class="px-3 py-1.5 font-medium text-right">Duration</th>
+										<th class="px-3 py-1.5 font-medium text-right">Time</th>
+									</tr>
+								</thead>
+								<tbody>
+									{#each slowest as span}
+										{@const dur = spanDurationMs(span) ?? 0}
+										{@const isOutlier = dur >= insightsData.p95}
+										<tr
+											class="border-b border-border/30 cursor-pointer transition-colors
+												{isOutlier ? 'hover:bg-warning/5 bg-warning/[0.02]' : 'hover:bg-bg-secondary/50'}"
+											onclick={() => goto(`/traces/${span.trace_id}`)}
+										>
+											<td class="px-3 py-1.5 font-mono text-xs text-text truncate max-w-[200px]">{span.name}</td>
+											<td class="px-3 py-1.5 text-text-secondary font-mono text-xs">{span.kind?.type === 'llm_call' ? span.kind.model : '-'}</td>
+											<td class="px-3 py-1.5"><StatusBadge status={spanStatus(span)} /></td>
+											<td class="px-3 py-1.5 text-right text-text-secondary font-mono text-xs tabular-nums">{formatTokens(span)}</td>
+											<td class="px-3 py-1.5 text-right text-text-secondary font-mono text-xs tabular-nums">{formatCost(span)}</td>
+											<td class="px-3 py-1.5 text-right font-mono text-xs tabular-nums {isOutlier ? 'text-warning font-semibold' : 'text-text-secondary'}">{formatDuration(dur)}</td>
+											<td class="px-3 py-1.5 text-right text-text-muted text-xs tabular-nums">{formatTime(spanStartedAt(span))}</td>
+										</tr>
+									{/each}
+								</tbody>
+							</table>
 						</div>
 					{/if}
 				</div>
-
-				<!-- Still show the table below scatter for detail -->
-				{#if scatterData.points.length > 0}
-					<div class="mt-3 border border-border rounded-lg overflow-hidden">
-						<table class="w-full text-sm">
-							<thead>
-								<tr class="text-left text-[11px] text-text-muted border-b border-border bg-bg-secondary/50 uppercase tracking-wider">
-									<th class="px-3 py-2 font-medium">Name</th>
-									<th class="px-3 py-2 font-medium">Model</th>
-									<th class="px-3 py-2 font-medium">Status</th>
-									<th class="px-3 py-2 font-medium text-right">Tokens</th>
-									<th class="px-3 py-2 font-medium text-right">Cost</th>
-									<th class="px-3 py-2 font-medium text-right">Duration</th>
-									<th class="px-3 py-2 font-medium text-right">Time</th>
-								</tr>
-							</thead>
-							<tbody>
-								{#each results as span}
-									<tr
-										class="border-b border-border/30 hover:bg-bg-secondary/50 cursor-pointer transition-colors"
-										onclick={() => goto(`/traces/${span.trace_id}`)}
-									>
-										<td class="px-3 py-1.5 font-mono text-xs text-text truncate max-w-[200px]">{span.name}</td>
-										<td class="px-3 py-1.5 text-text-secondary font-mono text-xs">{span.kind?.type === 'llm_call' ? span.kind.model : '-'}</td>
-										<td class="px-3 py-1.5"><StatusBadge status={spanStatus(span)} /></td>
-										<td class="px-3 py-1.5 text-right text-text-secondary font-mono text-xs tabular-nums">{formatTokens(span)}</td>
-										<td class="px-3 py-1.5 text-right text-text-secondary font-mono text-xs tabular-nums">{formatCost(span)}</td>
-										<td class="px-3 py-1.5 text-right text-text-secondary font-mono text-xs tabular-nums">{formatDuration(spanDurationMs(span))}</td>
-										<td class="px-3 py-1.5 text-right text-text-muted text-xs tabular-nums">{formatTime(spanStartedAt(span))}</td>
-									</tr>
-								{/each}
-							</tbody>
-						</table>
-					</div>
-				{/if}
 			{/if}
 
 		{:else}
