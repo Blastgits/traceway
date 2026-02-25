@@ -275,8 +275,31 @@ pub struct PersistentStore<B: StorageBackend> {
 
 impl<B: StorageBackend> PersistentStore<B> {
     pub async fn open(backend: B) -> Result<Self, StorageError> {
+        let (
+            spans,
+            traces_list,
+            file_versions,
+            ds_list,
+            dp_list,
+            qi_list,
+            er_list,
+            eres_list,
+            cr_list,
+            pc_list,
+        ) = tokio::try_join!(
+            backend.load_all_spans(),
+            backend.load_all_traces(),
+            backend.load_all_files(),
+            backend.load_all_datasets(),
+            backend.load_all_datapoints(),
+            backend.load_all_queue_items(),
+            backend.load_all_eval_runs(),
+            backend.load_all_eval_results(),
+            backend.load_all_capture_rules(),
+            backend.load_all_provider_connections(),
+        )?;
+
         let mut memory = SpanStore::new();
-        let spans = backend.load_all_spans().await?;
         let span_count = spans.len();
         for span in spans {
             memory.insert(span);
@@ -285,55 +308,14 @@ impl<B: StorageBackend> PersistentStore<B> {
             tracing::info!(count = span_count, "loaded spans from storage backend");
         }
 
-        let traces = backend.load_all_traces().await?;
-        let mut trace_meta = HashMap::new();
-        for trace in traces {
-            trace_meta.insert(trace.id, trace);
-        }
-
-        let file_versions = backend.load_all_files().await?;
-
-        let ds_list = backend.load_all_datasets().await?;
-        let mut datasets = HashMap::new();
-        for ds in ds_list {
-            datasets.insert(ds.id, ds);
-        }
-
-        let dp_list = backend.load_all_datapoints().await?;
-        let mut datapoints = HashMap::new();
-        for dp in dp_list {
-            datapoints.insert(dp.id, dp);
-        }
-
-        let qi_list = backend.load_all_queue_items().await?;
-        let mut queue_items = HashMap::new();
-        for qi in qi_list {
-            queue_items.insert(qi.id, qi);
-        }
-
-        let er_list = backend.load_all_eval_runs().await?;
-        let mut eval_runs = HashMap::new();
-        for er in er_list {
-            eval_runs.insert(er.id, er);
-        }
-
-        let eres_list = backend.load_all_eval_results().await?;
-        let mut eval_results = HashMap::new();
-        for eres in eres_list {
-            eval_results.insert(eres.id, eres);
-        }
-
-        let cr_list = backend.load_all_capture_rules().await?;
-        let mut capture_rules = HashMap::new();
-        for cr in cr_list {
-            capture_rules.insert(cr.id, cr);
-        }
-
-        let pc_list = backend.load_all_provider_connections().await?;
-        let mut provider_connections = HashMap::new();
-        for pc in pc_list {
-            provider_connections.insert(pc.id, pc);
-        }
+        let trace_meta: HashMap<_, _> = traces_list.into_iter().map(|t| (t.id, t)).collect();
+        let datasets: HashMap<_, _> = ds_list.into_iter().map(|d| (d.id, d)).collect();
+        let datapoints: HashMap<_, _> = dp_list.into_iter().map(|d| (d.id, d)).collect();
+        let queue_items: HashMap<_, _> = qi_list.into_iter().map(|q| (q.id, q)).collect();
+        let eval_runs: HashMap<_, _> = er_list.into_iter().map(|r| (r.id, r)).collect();
+        let eval_results: HashMap<_, _> = eres_list.into_iter().map(|r| (r.id, r)).collect();
+        let capture_rules: HashMap<_, _> = cr_list.into_iter().map(|r| (r.id, r)).collect();
+        let provider_connections: HashMap<_, _> = pc_list.into_iter().map(|p| (p.id, p)).collect();
 
         Ok(Self {
             memory,
