@@ -35,11 +35,12 @@ from .types import (
 class SpanContext:
     """Context manager for a span that auto-completes on exit or fails on exception."""
 
-    def __init__(self, client: "Traceway", span_id: str, trace_id: str):
+    def __init__(self, client: "Traceway", span_id: str, trace_id: str, kind: SpanKind | None = None):
         self._client = client
         self._span_id = span_id
         self._trace_id = trace_id
         self._output: Any = None
+        self._kind: SpanKind | None = kind
 
     @property
     def span_id(self) -> str:
@@ -51,6 +52,10 @@ class SpanContext:
 
     def set_output(self, output: Any) -> None:
         self._output = output
+
+    def set_kind(self, kind: SpanKind) -> None:
+        """Update the span kind (e.g. to add token counts after an LLM call)."""
+        self._kind = kind
 
 
 class TraceContext:
@@ -81,14 +86,14 @@ class TraceContext:
             kind=kind,
             input=input,
         )
-        ctx = SpanContext(self._client, created.id, self._trace_id)
+        ctx = SpanContext(self._client, created.id, self._trace_id, kind=kind)
         try:
             yield ctx
         except Exception as e:
             self._client.fail_span(created.id, str(e))
             raise
         else:
-            self._client.complete_span(created.id, output=ctx._output)
+            self._client.complete_span(created.id, output=ctx._output, kind=ctx._kind)
 
     @contextmanager
     def llm_call(
@@ -100,10 +105,26 @@ class TraceContext:
         parent_id: str | None = None,
         input: Any = None,
     ) -> Generator[SpanContext, None, None]:
-        """Convenience: create an LlmCall span within this trace."""
+        """Convenience: create an LlmCall span within this trace.
+        
+        After yielding, if ctx._output has 'input_tokens' and 'output_tokens' keys,
+        the span kind is automatically updated with token counts.
+        """
         kind = LlmCallKind(model=model, provider=provider)
         with self.span(name, kind=kind, parent_id=parent_id, input=input) as ctx:
             yield ctx
+            # Auto-populate token counts from output if available
+            if isinstance(ctx._output, dict):
+                input_tokens = ctx._output.get("input_tokens")
+                output_tokens = ctx._output.get("output_tokens")
+                actual_model = ctx._output.get("model", model)
+                if input_tokens is not None or output_tokens is not None:
+                    ctx._kind = LlmCallKind(
+                        model=actual_model,
+                        provider=provider,
+                        input_tokens=input_tokens,
+                        output_tokens=output_tokens,
+                    )
 
 
 class Traceway:
@@ -197,10 +218,12 @@ class Traceway:
         resp = self._request("POST", "/spans", json=data)
         return CreatedSpan.from_dict(resp)
 
-    def complete_span(self, span_id: str, *, output: Any = None) -> None:
+    def complete_span(self, span_id: str, *, output: Any = None, kind: SpanKind | None = None) -> None:
         data: dict[str, Any] = {}
         if output is not None:
             data["output"] = output
+        if kind is not None:
+            data["kind"] = span_kind_to_dict(kind)
         self._request("POST", f"/spans/{span_id}/complete", json=data if data else None)
 
     def fail_span(self, span_id: str, error: str) -> None:
@@ -404,11 +427,11 @@ class Traceway:
             kind=kind,
             input=input,
         )
-        ctx = SpanContext(self, created.id, trace_id)
+        ctx = SpanContext(self, created.id, trace_id, kind=kind)
         try:
             yield ctx
         except Exception as e:
             self.fail_span(created.id, str(e))
             raise
         else:
-            self.complete_span(created.id, output=ctx._output)
+            self.complete_span(created.id, output=ctx._output, kind=ctx._kind)
