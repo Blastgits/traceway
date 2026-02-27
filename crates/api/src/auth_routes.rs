@@ -5,7 +5,7 @@
 
 use axum::{
     extract::State,
-    http::{header, StatusCode},
+    http::{header, HeaderMap, StatusCode},
     response::IntoResponse,
     routing::{delete, get, post},
     Json, Router,
@@ -319,10 +319,21 @@ async fn signup(
 /// POST /api/auth/login – verify password, return session cookie.
 async fn login(
     State(state): State<AppState>,
+    headers: HeaderMap,
     Json(req): Json<LoginRequest>,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
     if state.auth_config.local_mode {
         return Err((StatusCode::NOT_FOUND, "Not available in local mode".into()));
+    }
+
+    // Rate limit by IP: 10 attempts per minute
+    let ip = crate::rate_limit::client_ip(&headers);
+    if let Err(retry_after) = state.login_rate_limiter.check(&ip) {
+        tracing::warn!(ip = %ip, "login rate limited");
+        return Err((
+            StatusCode::TOO_MANY_REQUESTS,
+            format!("Too many login attempts. Retry after {} seconds.", retry_after),
+        ));
     }
 
     let auth_store = state
@@ -793,10 +804,31 @@ async fn bcrypt_verify_find_invite(
 /// POST /api/auth/forgot-password – request a password reset email.
 async fn forgot_password(
     State(state): State<AppState>,
+    headers: HeaderMap,
     Json(req): Json<ForgotPasswordRequest>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
     if state.auth_config.local_mode {
         return Err((StatusCode::NOT_FOUND, "Not available in local mode".into()));
+    }
+
+    // Rate limit by IP: 10 requests per hour
+    let ip = crate::rate_limit::client_ip(&headers);
+    if let Err(retry_after) = state.password_reset_ip_rate_limiter.check(&ip) {
+        tracing::warn!(ip = %ip, "password reset rate limited (IP)");
+        return Err((
+            StatusCode::TOO_MANY_REQUESTS,
+            format!("Too many requests. Retry after {} seconds.", retry_after),
+        ));
+    }
+
+    // Rate limit by email: 3 requests per hour
+    let email_key = req.email.to_lowercase();
+    if let Err(retry_after) = state.password_reset_email_rate_limiter.check(&email_key) {
+        tracing::warn!(email = %email_key, "password reset rate limited (email)");
+        return Err((
+            StatusCode::TOO_MANY_REQUESTS,
+            format!("Too many requests. Retry after {} seconds.", retry_after),
+        ));
     }
 
     let auth_store = state.auth_store.as_ref()

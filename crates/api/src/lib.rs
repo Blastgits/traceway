@@ -7,6 +7,7 @@ pub mod events;
 pub mod jobs;
 pub mod metrics;
 pub mod org_store;
+pub mod rate_limit;
 
 pub use org_store::OrgStoreManager;
 
@@ -223,6 +224,12 @@ pub struct AppState {
     pub polar_webhook_secret: Option<String>,
     /// Polar.sh access token for creating checkout sessions
     pub polar_access_token: Option<String>,
+    /// Rate limiter for login attempts (per IP).
+    pub login_rate_limiter: Arc<rate_limit::RateLimiter>,
+    /// Rate limiter for password reset requests (per email).
+    pub password_reset_email_rate_limiter: Arc<rate_limit::RateLimiter>,
+    /// Rate limiter for password reset requests (per IP).
+    pub password_reset_ip_rate_limiter: Arc<rate_limit::RateLimiter>,
 }
 
 impl AppState {
@@ -304,6 +311,11 @@ pub struct FailSpanRequest {
 pub struct PaginationParams {
     pub limit: Option<usize>,
     pub cursor: Option<String>,
+}
+
+#[derive(Deserialize, ToSchema, utoipa::IntoParams)]
+pub struct QueueFilterParams {
+    pub status: Option<String>,
 }
 
 const DEFAULT_PAGE_SIZE: usize = 50;
@@ -2154,6 +2166,112 @@ async fn submit_queue_item(
     Ok(Json(item))
 }
 
+/// List all queue items across all datasets (for the review page)
+#[utoipa::path(
+    get,
+    path = "/api/queue",
+    params(
+        PaginationParams,
+        ("status" = Option<String>, Query, description = "Filter by status: pending, claimed, completed"),
+    ),
+    responses(
+        (status = 200, description = "All queue items across datasets"),
+    ),
+    security(("bearer" = [])),
+    tag = "queue"
+)]
+async fn list_all_queue_items(
+    auth::Auth(ctx): auth::Auth,
+    State(state): State<AppState>,
+    Query(params): Query<PaginationParams>,
+    Query(filter): Query<QueueFilterParams>,
+) -> Result<Json<Page<QueueItem>>, StatusCode> {
+    require_scope(&ctx, auth::Scope::DatasetsRead).map_err(|_| StatusCode::FORBIDDEN)?;
+    let store = state.store_for_project(ctx.org_id, ctx.project_id).await.map_err(store_err_status)?;
+    let r = store.read().await;
+    let mut items: Vec<QueueItem> = r
+        .all_queue_items()
+        .into_iter()
+        .cloned()
+        .collect();
+    // Filter by status if provided
+    if let Some(ref status_filter) = filter.status {
+        items.retain(|qi| qi.status.as_str() == status_filter.as_str());
+    }
+    // Sort: pending first, then by created_at desc
+    items.sort_by(|a, b| {
+        let status_ord = |s: &QueueItemStatus| match s {
+            QueueItemStatus::Pending => 0,
+            QueueItemStatus::Claimed => 1,
+            QueueItemStatus::Completed => 2,
+        };
+        status_ord(&a.status)
+            .cmp(&status_ord(&b.status))
+            .then_with(|| b.created_at.cmp(&a.created_at))
+    });
+    let page = paginate(items, &params)?;
+    Ok(Json(page))
+}
+
+/// Export a span to a dataset and enqueue it for review in one step
+#[utoipa::path(
+    post,
+    path = "/api/datasets/{id}/export-span-and-enqueue",
+    params(("id" = String, Path, description = "Dataset ID")),
+    request_body = ExportSpanRequest,
+    responses(
+        (status = 201, description = "Span exported and enqueued", body = QueueItem),
+        (status = 404, description = "Dataset or span not found"),
+    ),
+    security(("bearer" = [])),
+    tag = "queue"
+)]
+async fn export_span_and_enqueue(
+    auth::Auth(ctx): auth::Auth,
+    State(state): State<AppState>,
+    Path(dataset_id): Path<DatasetId>,
+    Json(req): Json<ExportSpanRequest>,
+) -> Result<(StatusCode, Json<QueueItem>), StatusCode> {
+    require_scope(&ctx, auth::Scope::DatasetsWrite).map_err(|_| StatusCode::FORBIDDEN)?;
+    let store = state.store_for_project(ctx.org_id, ctx.project_id).await.map_err(store_err_status)?;
+    let mut w = store.write().await;
+
+    if w.get_dataset_or_load(dataset_id).await.is_none() {
+        return Err(StatusCode::NOT_FOUND);
+    }
+
+    // Find the span
+    let span = w.get(req.span_id).ok_or(StatusCode::NOT_FOUND)?.clone();
+
+    // Create datapoint from span (same logic as export_span_to_dataset)
+    let kind = DatapointKind::Generic {
+        input: span.input().cloned().unwrap_or(serde_json::Value::Null),
+        expected_output: span.output().cloned(),
+        actual_output: None,
+        score: None,
+        metadata: HashMap::new(),
+    };
+    let dp = Datapoint::new(dataset_id, kind, DatapointSource::SpanExport)
+        .with_source_span(req.span_id);
+    let dp_id = dp.id;
+    let original_data = serde_json::to_value(&dp.kind).ok();
+
+    // Save datapoint
+    let _ = state
+        .events_tx
+        .send(SystemEvent::DatapointCreated { datapoint: dp.clone() });
+    w.save_datapoint(dp).await;
+
+    // Create and save queue item
+    let item = QueueItem::new(dataset_id, dp_id, original_data);
+    let _ = state
+        .events_tx
+        .send(SystemEvent::QueueItemUpdated { item: item.clone() });
+    w.save_queue_item(item.clone()).await;
+
+    Ok((StatusCode::CREATED, Json(item)))
+}
+
 // --- Analytics handlers ---
 
 /// Query analytics with filters and grouping
@@ -3422,6 +3540,27 @@ fn build_router(
         Arc::new(auth::NoopEmailSender) as Arc<dyn auth::EmailSender>
     });
     let app_url = app_url.unwrap_or_else(|| "http://localhost:3000".to_string());
+    // Rate limiters: login = 10 req/IP/min, password reset = 3/email/hr + 10/IP/hr
+    let login_rate_limiter = Arc::new(rate_limit::RateLimiter::new(10, std::time::Duration::from_secs(60)));
+    let password_reset_email_rate_limiter = Arc::new(rate_limit::RateLimiter::new(3, std::time::Duration::from_secs(3600)));
+    let password_reset_ip_rate_limiter = Arc::new(rate_limit::RateLimiter::new(10, std::time::Duration::from_secs(3600)));
+
+    // Spawn background cleanup for rate limiters every 5 minutes
+    {
+        let login_rl = login_rate_limiter.clone();
+        let reset_email_rl = password_reset_email_rate_limiter.clone();
+        let reset_ip_rl = password_reset_ip_rate_limiter.clone();
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(std::time::Duration::from_secs(300));
+            loop {
+                interval.tick().await;
+                login_rl.cleanup();
+                reset_email_rl.cleanup();
+                reset_ip_rl.cleanup();
+            }
+        });
+    }
+
     let state = AppState {
         org_stores,
         events_tx,
@@ -3436,6 +3575,9 @@ fn build_router(
         app_url,
         polar_webhook_secret,
         polar_access_token,
+        login_rate_limiter,
+        password_reset_email_rate_limiter,
+        password_reset_ip_rate_limiter,
     };
 
     // In cloud mode with a separate frontend origin, we need explicit origins
@@ -3515,6 +3657,8 @@ fn build_router(
         .route("/datasets/:id/export-span", post(export_span_to_dataset))
         .route("/datasets/:id/import", post(import_file))
         .route("/datasets/:id/queue", get(list_queue).post(enqueue_datapoints))
+        .route("/datasets/:id/export-span-and-enqueue", post(export_span_and_enqueue))
+        .route("/queue", get(list_all_queue_items))
         .route("/queue/:item_id/claim", post(claim_queue_item))
         .route("/queue/:item_id/submit", post(submit_queue_item))
         // Eval runs
