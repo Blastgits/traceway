@@ -898,6 +898,10 @@ impl<B: StorageBackend> PersistentStore<B> {
             .collect()
     }
 
+    pub fn all_queue_items(&self) -> Vec<&QueueItem> {
+        self.queue_items.values().collect()
+    }
+
     pub async fn claim_queue_item(
         &mut self,
         id: QueueItemId,
