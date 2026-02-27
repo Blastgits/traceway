@@ -6,6 +6,9 @@
 		submitQueueItem,
 		subscribeEvents,
 		shortId,
+		getAuthConfig,
+		getAuthMe,
+		getOrgMembers,
 		type QueueItem,
 		type DatasetWithCount,
 	} from '$lib/api';
@@ -19,7 +22,7 @@
 	// Filter
 	let statusFilter: 'all' | 'pending' | 'claimed' | 'completed' = $state('pending');
 
-	// Claim
+	// Reviewer identity (resolved from auth)
 	let claimName = $state('reviewer');
 
 	// Review mode
@@ -114,6 +117,23 @@
 		} catch {
 			// API not available
 		}
+
+		// Resolve reviewer name from auth
+		try {
+			const config = await getAuthConfig();
+			if (config.mode === 'cloud') {
+				const me = await getAuthMe();
+				if (me.user_id) {
+					const members = await getOrgMembers();
+					const self = members.find((m) => m.id === me.user_id);
+					if (self?.name) claimName = self.name;
+					else if (self?.email) claimName = self.email;
+				}
+			}
+		} catch {
+			// Local mode or auth unavailable — keep default 'reviewer'
+		}
+
 		loading = false;
 	}
 
@@ -217,15 +237,6 @@
 		<div>
 			<h1 class="text-lg font-bold text-text">Review</h1>
 			<p class="text-xs text-text-muted mt-0.5">Human annotation queue across all datasets</p>
-		</div>
-		<div class="flex items-center gap-2">
-			<label for="claim-name" class="text-xs text-text-muted">Reviewing as:</label>
-			<input
-				id="claim-name"
-				type="text"
-				bind:value={claimName}
-				class="bg-bg-tertiary border border-border rounded px-2 py-1 text-xs text-text w-28"
-			/>
 		</div>
 	</div>
 
