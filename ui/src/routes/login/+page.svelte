@@ -13,15 +13,19 @@
 		error = '';
 		loading = true;
 
-		const result = await login(email, password);
+		try {
+			const result = await login(email, password);
 
-		if (result.ok) {
-			window.location.href = '/';
-		} else {
-			error = result.error ?? 'Invalid email or password';
+			if (result.ok) {
+				window.location.href = '/';
+			} else {
+				error = result.error ?? 'Invalid email or password';
+			}
+		} catch {
+			error = 'Unable to reach the API. Please try again.';
+		} finally {
+			loading = false;
 		}
-
-		loading = false;
 	}
 </script>
 
