@@ -64,6 +64,7 @@
 	const isCloudMode = $derived(authConfig.mode === 'cloud');
 	const isAuthenticated = $derived(authMe !== null);
 	const needsLogin = $derived(authChecked && isCloudMode && !isAuthPage && !isAuthenticated && !apiUnreachable);
+	const apiTarget = (import.meta.env.VITE_API_URL as string | undefined) || '/api';
 
 	$effect(() => {
 		if (needsLogin) {
@@ -274,7 +275,8 @@
 		<div class="text-center space-y-3">
 			<div class="text-text font-bold text-lg">Cannot reach API</div>
 			<div class="text-text-muted text-sm max-w-md">
-				Unable to connect to the Traceway backend. Check that the daemon is running and <code class="text-accent">VITE_API_URL</code> is set correctly.
+				Unable to connect to the Traceway backend at <code class="text-accent">{apiTarget}</code>.
+				For local dev, run <code class="text-accent">cd backend/app && encore run</code>.
 			</div>
 			<button onclick={() => location.reload()} class="mt-2 px-4 py-1.5 text-sm bg-accent/10 text-accent rounded hover:bg-accent/20 transition-colors">
 				Retry

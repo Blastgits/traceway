@@ -21,15 +21,19 @@
 
 		loading = true;
 
-		const result = await signup(email, password, name || undefined, orgName || undefined);
+		try {
+			const result = await signup(email, password, name || undefined, orgName || undefined);
 
-		if (result.ok) {
-			window.location.href = '/';
-		} else {
-			error = result.error ?? 'Signup failed';
+			if (result.ok) {
+				window.location.href = '/';
+			} else {
+				error = result.error ?? 'Signup failed';
+			}
+		} catch {
+			error = 'Unable to reach the API. Please try again.';
+		} finally {
+			loading = false;
 		}
-
-		loading = false;
 	}
 </script>
 
