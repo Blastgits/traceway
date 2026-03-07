@@ -1,6 +1,8 @@
 import { SQLDatabase } from "encore.dev/storage/sqldb";
 import { drizzle } from "drizzle-orm/node-postgres";
-import { Pool } from "pg";
+import pg from "pg";
+
+const { Pool } = pg;
 
 const DB = new SQLDatabase("traceway_backend", {
   migrations: {

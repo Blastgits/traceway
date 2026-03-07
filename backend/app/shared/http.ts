@@ -24,6 +24,9 @@ function allowOrigin(origin: string | undefined): string | null {
 }
 
 export function setCors(req: IncomingMessage, res: ServerResponse): void {
+  if (req.headers.origin) {
+    return;
+  }
   const origin = allowOrigin(req.headers.origin);
   if (origin) {
     res.setHeader("access-control-allow-origin", origin);
