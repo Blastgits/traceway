@@ -44,6 +44,13 @@
 	const isAuthPage = $derived(authPages.includes(page.url.pathname));
 	const isCloudMode = $derived(authConfig.mode === 'cloud');
 	const isAuthenticated = $derived(authMe !== null || authConfig.mode === 'local');
+	const needsLogin = $derived(authChecked && isCloudMode && !isAuthPage && !isAuthenticated && !apiUnreachable);
+
+	$effect(() => {
+		if (needsLogin) {
+			goto('/login');
+		}
+	});
 
 	onMount(() => {
 		document.addEventListener('keydown', handleGlobalKeydown);
@@ -249,6 +256,10 @@
 				Retry
 			</button>
 		</div>
+	</div>
+{:else if needsLogin}
+	<div class="min-h-screen flex items-center justify-center bg-bg">
+		<div class="text-text-muted text-sm">Redirecting to login...</div>
 	</div>
 {:else}
 	<div class="min-h-screen flex">
