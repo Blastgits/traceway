@@ -67,15 +67,18 @@
 	onMount(loadData);
 </script>
 
-<div class="max-w-3xl space-y-6">
+<div class="w-full space-y-5">
 	<div class="flex items-center justify-between">
-		<h1 class="text-xl font-bold">Team</h1>
+		<div>
+			<h1 class="text-xl font-semibold tracking-tight">Team</h1>
+			<p class="text-xs text-text-muted mt-1">Manage members and invites in one place.</p>
+		</div>
 		<button
 			onclick={() => {
 				showInvite = true;
 				sent = false;
 			}}
-			class="px-3 py-1.5 text-sm bg-accent text-bg font-semibold rounded hover:bg-accent/80 transition-colors"
+			class="px-3 py-1.5 text-sm bg-accent text-bg font-semibold rounded-lg hover:bg-accent/80 transition-colors"
 		>
 			Invite member
 		</button>
@@ -86,20 +89,20 @@
 	</p>
 
 	{#if error}
-		<div class="bg-danger/10 border border-danger/30 rounded px-3 py-2 text-danger text-sm">
+		<div class="bg-danger/10 border border-danger/30 rounded-xl px-3 py-2 text-danger text-sm">
 			{error}
 		</div>
 	{/if}
 
 	{#if sent}
-		<div class="bg-success/10 border border-success/30 rounded px-3 py-2 text-success text-sm">
+		<div class="bg-success/10 border border-success/30 rounded-xl px-3 py-2 text-success text-sm">
 			Invite sent successfully.
 		</div>
 	{/if}
 
 	<!-- Invite form -->
 	{#if showInvite}
-		<form onsubmit={handleInvite} class="bg-bg-secondary border border-border rounded p-4 space-y-3">
+		<form onsubmit={handleInvite} class="glass-surface rounded-2xl p-4 space-y-3">
 			<h2 class="text-sm font-semibold text-text">Invite a team member</h2>
 			<div>
 				<label for="invite-email" class="block text-xs text-text-secondary mb-1">Email address</label>
@@ -109,7 +112,7 @@
 					bind:value={inviteEmail}
 					required
 					placeholder="colleague@example.com"
-					class="w-full bg-bg-tertiary border border-border rounded px-3 py-2 text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-accent"
+					class="w-full bg-bg-tertiary border border-border rounded-lg px-3 py-2 text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-accent"
 				/>
 			</div>
 			<div>
@@ -117,7 +120,7 @@
 				<select
 					id="invite-role"
 					bind:value={inviteRole}
-					class="w-full bg-bg-tertiary border border-border rounded px-3 py-2 text-sm text-text focus:outline-none focus:border-accent"
+					class="w-full bg-bg-tertiary border border-border rounded-lg px-3 py-2 text-sm text-text focus:outline-none focus:border-accent"
 				>
 					<option value="member">Member</option>
 					<option value="admin">Admin</option>
@@ -127,14 +130,14 @@
 				<button
 					type="submit"
 					disabled={sending}
-					class="px-4 py-1.5 text-sm bg-accent text-bg font-semibold rounded hover:bg-accent/80 transition-colors disabled:opacity-50"
+					class="px-4 py-1.5 text-sm bg-accent text-bg font-semibold rounded-lg hover:bg-accent/80 transition-colors disabled:opacity-50"
 				>
 					{sending ? 'Sending...' : 'Send invite'}
 				</button>
 				<button
 					type="button"
 					onclick={() => (showInvite = false)}
-					class="px-4 py-1.5 text-sm bg-bg-tertiary text-text rounded hover:bg-bg-secondary transition-colors"
+					class="px-4 py-1.5 text-sm bg-bg-tertiary text-text rounded-lg hover:bg-bg-secondary transition-colors"
 				>
 					Cancel
 				</button>
@@ -148,13 +151,13 @@
 		{#if loading}
 			<div class="text-text-muted text-sm py-8 text-center">Loading...</div>
 		{:else if members.length === 0}
-			<div class="text-text-muted text-sm py-8 text-center bg-bg-secondary border border-border rounded">
+			<div class="table-float text-text-muted text-sm py-8 text-center">
 				No members yet.
 			</div>
 		{:else}
-			<div class="bg-bg-secondary border border-border rounded divide-y divide-border">
+			<div class="table-float divide-y divide-border/40">
 				{#each members as member}
-					<div class="px-4 py-3 flex items-center justify-between">
+					<div class="px-4 py-3 flex items-center justify-between hover:bg-bg-tertiary/20 transition-colors">
 						<div class="space-y-0.5">
 							<div class="text-sm font-medium text-text">
 								{member.name || member.email}
@@ -174,9 +177,9 @@
 	{#if !loading && invites.length > 0}
 		<div class="space-y-2">
 			<h2 class="text-sm font-semibold text-text-secondary uppercase tracking-wide">Pending Invites</h2>
-			<div class="bg-bg-secondary border border-border rounded divide-y divide-border">
+			<div class="table-float divide-y divide-border/40">
 				{#each invites as invite}
-					<div class="px-4 py-3 flex items-center justify-between">
+					<div class="px-4 py-3 flex items-center justify-between hover:bg-bg-tertiary/20 transition-colors">
 						<div class="space-y-0.5">
 							<div class="text-sm font-medium text-text">{invite.email}</div>
 							<div class="text-xs text-text-muted">

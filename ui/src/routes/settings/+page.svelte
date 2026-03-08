@@ -15,7 +15,7 @@
 	let showClearConfirm = $state(false);
 	let clearing = $state(false);
 
-	const isCloudMode = $derived(authConfig?.mode === 'cloud');
+	const isCloudMode = $derived.by((): boolean => authConfig?.mode === 'cloud');
 
 	// Find current user from members list
 	const currentUser = $derived.by(() => {
@@ -24,7 +24,7 @@
 	});
 
 	// Usage calculations — monthly spans vs plan limit
-	const spanLimit = $derived(org?.plan_limits?.spans_per_month ?? 0);
+	const spanLimit = $derived.by((): number => org?.plan_limits?.spans_per_month ?? 0);
 	const spanUsage = $derived(isCloudMode ? monthlySpans : stats.span_count);
 	const usagePct = $derived(spanLimit > 0 ? Math.min(100, (spanUsage / spanLimit) * 100) : 0);
 	const usageColor = $derived(usagePct > 90 ? 'bg-danger' : usagePct > 70 ? 'bg-warning' : 'bg-accent');
@@ -104,7 +104,7 @@
 	}
 </script>
 
-<div class="max-w-4xl space-y-5">
+<div class="w-full space-y-5">
 	<h1 class="text-xl font-semibold tracking-tight">Settings</h1>
 
 	{#if loading}
