@@ -65,12 +65,15 @@
 	onMount(loadKeys);
 </script>
 
-<div class="max-w-3xl space-y-6">
+<div class="w-full space-y-5">
 	<div class="flex items-center justify-between">
-		<h1 class="text-xl font-bold">API Keys</h1>
+		<div>
+			<h1 class="text-xl font-semibold tracking-tight">API Keys</h1>
+			<p class="text-xs text-text-muted mt-1">Create and rotate ingestion keys for SDKs and external tools.</p>
+		</div>
 		<button
 			onclick={() => { showCreate = true; createdKey = null; }}
-			class="px-3 py-1.5 text-sm bg-accent text-bg font-semibold rounded hover:bg-accent/80 transition-colors"
+			class="px-3 py-1.5 text-sm bg-accent text-bg font-semibold rounded-lg hover:bg-accent/80 transition-colors"
 		>
 			Create key
 		</button>
@@ -82,23 +85,23 @@
 	</p>
 
 	{#if error}
-		<div class="bg-danger/10 border border-danger/30 rounded px-3 py-2 text-danger text-sm">
+		<div class="bg-danger/10 border border-danger/30 rounded-xl px-3 py-2 text-danger text-sm">
 			{error}
 		</div>
 	{/if}
 
 	<!-- Newly created key banner -->
 	{#if createdKey}
-		<div class="bg-success/10 border border-success/30 rounded p-4 space-y-2">
+		<div class="glass-surface border-success/30 rounded-2xl p-4 space-y-2">
 			<p class="text-sm font-semibold text-text">Key created: {createdKey.name}</p>
 			<p class="text-xs text-text-muted">Copy this key now. You won't be able to see it again.</p>
 			<div class="flex items-center gap-2">
-				<code class="flex-1 bg-bg-tertiary border border-border rounded px-3 py-2 text-sm font-mono text-text select-all break-all">
+				<code class="flex-1 bg-bg-tertiary border border-border rounded-lg px-3 py-2 text-sm font-mono text-text select-all break-all">
 					{createdKey.key}
 				</code>
 				<button
 					onclick={copyKey}
-					class="shrink-0 px-3 py-2 text-xs bg-bg-tertiary border border-border rounded hover:bg-bg-secondary transition-colors"
+					class="shrink-0 px-3 py-2 text-xs bg-bg-tertiary border border-border rounded-lg hover:bg-bg-secondary transition-colors"
 				>
 					{copied ? 'Copied!' : 'Copy'}
 				</button>
@@ -108,7 +111,7 @@
 
 	<!-- Create form -->
 	{#if showCreate}
-		<form onsubmit={handleCreate} class="bg-bg-secondary border border-border rounded p-4 space-y-3">
+		<form onsubmit={handleCreate} class="glass-surface rounded-2xl p-4 space-y-3">
 			<h2 class="text-sm font-semibold text-text">New API Key</h2>
 			<div>
 				<label for="key-name" class="block text-xs text-text-secondary mb-1">Key name</label>
@@ -118,21 +121,21 @@
 					bind:value={newKeyName}
 					required
 					placeholder="e.g. Production, CI/CD, Development"
-					class="w-full bg-bg-tertiary border border-border rounded px-3 py-2 text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-accent"
+					class="w-full bg-bg-tertiary border border-border rounded-lg px-3 py-2 text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-accent"
 				/>
 			</div>
 			<div class="flex gap-2">
 				<button
 					type="submit"
 					disabled={creating}
-					class="px-4 py-1.5 text-sm bg-accent text-bg font-semibold rounded hover:bg-accent/80 transition-colors disabled:opacity-50"
+					class="px-4 py-1.5 text-sm bg-accent text-bg font-semibold rounded-lg hover:bg-accent/80 transition-colors disabled:opacity-50"
 				>
 					{creating ? 'Creating...' : 'Create'}
 				</button>
 				<button
 					type="button"
 					onclick={() => showCreate = false}
-					class="px-4 py-1.5 text-sm bg-bg-tertiary text-text rounded hover:bg-bg-secondary transition-colors"
+					class="px-4 py-1.5 text-sm bg-bg-tertiary text-text rounded-lg hover:bg-bg-secondary transition-colors"
 				>
 					Cancel
 				</button>
@@ -144,13 +147,13 @@
 	{#if loading}
 		<div class="text-text-muted text-sm py-8 text-center">Loading...</div>
 	{:else if keys.length === 0}
-		<div class="text-text-muted text-sm py-8 text-center bg-bg-secondary border border-border rounded">
+		<div class="table-float text-text-muted text-sm py-8 text-center">
 			No API keys yet. Create one to get started.
 		</div>
 	{:else}
-		<div class="bg-bg-secondary border border-border rounded divide-y divide-border">
+		<div class="table-float divide-y divide-border/40">
 			{#each keys as key}
-				<div class="px-4 py-3 flex items-center justify-between">
+				<div class="px-4 py-3 flex items-center justify-between hover:bg-bg-tertiary/20 transition-colors">
 					<div class="space-y-0.5">
 						<div class="text-sm font-medium text-text">{key.name}</div>
 						<div class="text-xs text-text-muted font-mono">

@@ -255,44 +255,44 @@
 	});
 </script>
 
-<div class="max-w-3xl space-y-6">
+<div class="w-full space-y-5">
 	<div class="flex items-center justify-between">
 		<div>
-			<h1 class="text-xl font-bold">Providers</h1>
+			<h1 class="text-xl font-semibold tracking-tight">Providers</h1>
 			<p class="text-text-muted text-sm mt-1">Connect LLM providers to use in evals and traces.</p>
 		</div>
 		<button
 			onclick={openAddModal}
-			class="px-4 py-2 text-sm bg-accent text-bg font-semibold rounded hover:bg-accent/80 transition-colors"
+			class="px-4 py-2 text-sm bg-accent text-bg font-semibold rounded-lg hover:bg-accent/80 transition-colors"
 		>+ Add Provider</button>
 	</div>
 
 	{#if error && !showModal}
-		<div class="bg-danger/10 border border-danger/30 rounded px-3 py-2 text-danger text-sm">{error}</div>
+		<div class="bg-danger/10 border border-danger/30 rounded-xl px-3 py-2 text-danger text-sm">{error}</div>
 	{/if}
 	{#if success}
-		<div class="bg-success/10 border border-success/30 rounded px-3 py-2 text-success text-sm">{success}</div>
+		<div class="bg-success/10 border border-success/30 rounded-xl px-3 py-2 text-success text-sm">{success}</div>
 	{/if}
 
 	<!-- Active connections -->
 	{#if loading}
 		<div class="text-text-muted text-sm py-8 text-center">Loading...</div>
 	{:else if connections.length === 0 && !showModal}
-		<div class="text-center py-12 border border-dashed border-border rounded-lg">
+		<div class="table-float text-center py-12 border-dashed">
 			<p class="text-text-muted text-sm mb-1">No providers connected yet.</p>
 			<p class="text-text-muted text-xs mb-4">Add a provider to run evals and use LLM features.</p>
 			<button
 				onclick={openAddModal}
-				class="px-4 py-2 text-sm bg-accent text-bg font-semibold rounded hover:bg-accent/80 transition-colors"
+				class="px-4 py-2 text-sm bg-accent text-bg font-semibold rounded-lg hover:bg-accent/80 transition-colors"
 			>+ Add Provider</button>
 		</div>
 	{:else}
-		<div class="space-y-2">
+		<div class="table-float divide-y divide-border/40">
 			{#each connections as conn (conn.id)}
 				{@const prov = getProviderDef(conn.provider)}
 				{#if editingId === conn.id}
 					<!-- Edit form -->
-					<form onsubmit={handleUpdate} class="bg-bg-secondary border border-border rounded-lg p-4 space-y-3">
+					<form onsubmit={handleUpdate} class="glass-surface rounded-none p-4 space-y-3">
 						<div class="flex items-center gap-2 mb-1">
 							<div class="w-6 h-6 rounded flex items-center justify-center" style="color: {prov.color}">
 								{@html prov.icon}
@@ -304,27 +304,27 @@
 							<div>
 								<label for="edit-name" class="block text-xs text-text-secondary mb-1">Name</label>
 								<input id="edit-name" type="text" bind:value={editName} required
-									class="w-full bg-bg-tertiary border border-border rounded px-3 py-1.5 text-sm text-text focus:outline-none focus:border-accent" />
+									class="w-full bg-bg-tertiary border border-border rounded-lg px-3 py-1.5 text-sm text-text focus:outline-none focus:border-accent" />
 							</div>
 							<div>
 								<label for="edit-model" class="block text-xs text-text-secondary mb-1">Default Model</label>
 								<input id="edit-model" type="text" bind:value={editDefaultModel} placeholder={prov.defaultModel}
-									class="w-full bg-bg-tertiary border border-border rounded px-3 py-1.5 text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-accent font-mono" />
+									class="w-full bg-bg-tertiary border border-border rounded-lg px-3 py-1.5 text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-accent font-mono" />
 							</div>
 						</div>
 						<div>
 							<label for="edit-url" class="block text-xs text-text-secondary mb-1">Base URL</label>
 							<input id="edit-url" type="text" bind:value={editBaseUrl} placeholder={prov.baseUrl}
-								class="w-full bg-bg-tertiary border border-border rounded px-3 py-1.5 text-text placeholder:text-text-muted focus:outline-none focus:border-accent font-mono text-xs" />
+								class="w-full bg-bg-tertiary border border-border rounded-lg px-3 py-1.5 text-text placeholder:text-text-muted focus:outline-none focus:border-accent font-mono text-xs" />
 						</div>
 						<div>
 							<label for="edit-key" class="block text-xs text-text-secondary mb-1">API Key <span class="text-text-muted">(leave blank to keep existing)</span></label>
 							<input id="edit-key" type="password" bind:value={editApiKey} placeholder="Enter new key"
-								class="w-full bg-bg-tertiary border border-border rounded px-3 py-1.5 text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-accent" />
+								class="w-full bg-bg-tertiary border border-border rounded-lg px-3 py-1.5 text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-accent" />
 						</div>
 						<div class="flex gap-2">
 							<button type="submit" disabled={saving}
-								class="px-3 py-1.5 text-xs bg-accent text-bg font-semibold rounded hover:bg-accent/80 disabled:opacity-50">
+								class="px-3 py-1.5 text-xs bg-accent text-bg font-semibold rounded-lg hover:bg-accent/80 disabled:opacity-50">
 								{saving ? 'Saving...' : 'Save'}
 							</button>
 							<button type="button" onclick={() => { editingId = null; }}
@@ -333,7 +333,7 @@
 					</form>
 				{:else}
 					<!-- Connection row -->
-					<div class="bg-bg-secondary border border-border rounded-lg px-4 py-3 flex items-center gap-3 group">
+					<div class="px-4 py-3 flex items-center gap-3 group hover:bg-bg-tertiary/20 transition-colors">
 						<div class="shrink-0 w-8 h-8 rounded-lg flex items-center justify-center" style="background: {prov.color}15; color: {prov.color}">
 							{@html prov.icon}
 						</div>
@@ -386,7 +386,7 @@
 			<!-- Header -->
 			<div class="px-5 py-4 border-b border-border flex items-center justify-between">
 				<h2 class="text-base font-semibold text-text">Add API key</h2>
-				<button onclick={closeModal} class="text-text-muted hover:text-text transition-colors">
+				<button onclick={closeModal} class="text-text-muted hover:text-text transition-colors" aria-label="Close add provider modal" title="Close">
 					<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 						<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
 					</svg>
