@@ -1,112 +1,159 @@
 # Traceway
-<img width="2870" height="1140" alt="853b4311ceb992ef099677d1ddd0696e56406a2f6b0e9ad8ca7f3a940b20da19" src="https://github.com/user-attachments/assets/ce066845-5a6a-44af-a48e-22d8c317c33e" />
 
-Observability platform for LLM applications. Capture traces, spans, token usage, cost, and file I/O — then analyze everything through a web UI and REST API.
+Observability for LLM apps: traces, spans, tokens, cost, datasets, review queues, and analytics.
 
-Runs locally with zero config, or deploy to the cloud with Turbopuffer + Postgres.
+## README Navigation
 
-<!-- Add a screenshot: drag an image into a GitHub issue/PR to get a URL, then paste it here -->
-<!-- ![Traceway UI](https://github.com/user-attachments/assets/your-screenshot.png) -->
+- [Quick Start](#quick-start)
+- [Running](#running)
+- [Contributing](#contributing)
+- [Architecture](#architecture)
+- [Traceway API (Encore)](#traceway-api-encore)
+- [Ingestor Daemon (Rust)](#ingestor-daemon-rust)
+- [Full System Architecture](#full-system-architecture)
 
-## Features
+## Quick Start
 
-- **Structured tracing** — Spans with typed kinds: `llm_call`, `fs_read`, `fs_write`, `custom`
-- **Transparent LLM proxy** — Drop-in proxy for Ollama/OpenAI; traces captured automatically
-- **Token & cost tracking** — Per-model input/output token counts and cost
-- **File versioning** — Content-addressed snapshots of every file read/written during a trace
-- **Analytics** — Aggregate cost, tokens, latency with flexible group-by queries and a configurable dashboard
-- **Datasets** — Export spans to datasets, import CSVs, label via a review queue
-- **Real-time events** — SSE stream for live trace/span updates
-- **Web UI** — Trace explorer, span waterfall, query builder, analytics dashboard, file browser
+### 1) Install prerequisites
 
-## Quick Start (Local)
+- Node.js 20+
+- npm
+- Encore CLI (required for the new API): <https://encore.dev/docs/ts/install>
 
-Single binary, SQLite storage, no dependencies.
+Quick check:
+
+```sh
+encore version
+node -v
+```
+
+### 2) Clone and configure
 
 ```sh
 git clone https://github.com/andrewn6/llm-fs.git
 cd llm-fs
-
-cargo build -p daemon --release
-./target/release/daemon --foreground
+cp backend/app/.env.example backend/app/.env
+cp ui/.env.example ui/.env
 ```
 
-API at `localhost:3000`, proxy at `localhost:3001`. Open `localhost:3000` for the UI.
+### 3) Run backend API (Encore)
 
 ```sh
-curl http://localhost:3000/api/health
+cd backend/app
+encore run
 ```
 
-## Cloud Mode
-
-Turbopuffer for trace storage, Postgres for auth, JWT sessions.
+### 4) Run UI (new terminal)
 
 ```sh
-# .env (auto-loaded by the daemon)
-STORAGE_BACKEND=turbopuffer
-TURBOPUFFER_API_KEY=tpuf_xxx
-TURBOPUFFER_NAMESPACE=traceway
-DATABASE_URL=postgresql://user:pass@host/db
-PORT=3000
-
-# Build with cloud feature and run
-cargo build -p daemon --release --features cloud
-./target/release/daemon --cloud
+cd ui
+npm install
+npm run dev
 ```
 
-Cloud mode adds:
-- **Multi-tenant auth** — Signup/login, orgs, API keys, JWT sessions
-- **Turbopuffer storage** — Namespaced vector-native storage for traces, spans, datasets
-- **Postgres auth store** — Users, orgs, API keys, invites with auto-migrations
+Local endpoints:
 
-## SDKs
+- API: `http://localhost:4000`
+- Encore dashboard: `http://localhost:9400`
+- UI: `http://localhost:5173`
 
-- **Python** — `sdk/python/`
-- **TypeScript** — `sdk/typescript/`
+Smoke test:
 
-```python
-from traceway import Traceway
-
-tw = Traceway()
-with tw.trace("my-task") as trace:
-    with trace.span("planning", kind="llm_call", model="gpt-4") as span:
-        result = call_llm(...)
-        span.complete(output=result)
+```sh
+curl http://localhost:4000/health
 ```
+
+## Running
+
+### Product stack (recommended)
+
+```sh
+# Terminal 1
+cd backend/app && encore run
+
+# Terminal 2
+cd ui && npm run dev
+```
+
+### Optional: Rust ingestor/infra daemon
+
+```sh
+cargo run -p traceway --features cloud -- --cloud
+```
+
+Use this when working on ingest/infra paths (not required for normal UI + API product development).
+
+## Contributing
+
+- Start with [CONTRIBUTING.md](./CONTRIBUTING.md)
+- Backend service docs: [`backend/app/README.md`](./backend/app/README.md)
+- UI docs: [`ui/README.md`](./ui/README.md)
 
 ## Architecture
 
-```
-┌─────────────┐      ┌─────────────┐
-│  Your App   │      │  LLM Server │
-└──────┬──────┘      └──────▲──────┘
-       │                     │
-       ▼                     │
-┌──────────────┐    ┌────────┴───────┐
-│   API :3000  │    │  Proxy :3001   │
-│  (REST+SSE)  │    │  (transparent) │
-└──────┬───────┘    └────────┬───────┘
-       │                     │
-       ▼                     ▼
-┌──────────────────────────────────────┐
-│           Storage Layer              │
-│   SQLite (local) or Turbopuffer      │
-└──────────────────────────────────────┘
-```
+Traceway now runs with an **Encore-first product API**.
 
-## Development
+- `backend/app` (Encore.ts): browser-facing API, auth, org/project domains, traces/spans/files, datasets/queue/evals, analytics, billing.
+- `ui` (SvelteKit): primary web app.
+- Rust components: ingest + infra responsibilities.
+- Postgres: source of truth.
+- Turbopuffer: secondary search index (best-effort mirror).
+
+## Traceway API (Encore)
+
+Location: `backend/app`
+
+Core responsibilities:
+
+- Auth and session flows
+- Trace/span CRUD and live updates (SSE)
+- File-version and dataset/review workflows
+- Analytics and dashboard queries
+- Provider connection and billing endpoints
+
+Dev workflow:
 
 ```sh
-# Backend
-cargo check -p trace -p storage -p api -p proxy -p daemon
-TRACEWAY_LOG=debug cargo run -p daemon -- --foreground
-
-# UI
-cd ui && npm install && npm run dev    # localhost:5173
-
-# Cloud backend
-cargo run -p daemon --features cloud -- --cloud
+cd backend/app
+encore run
 ```
+
+Generate OpenAPI + UI types (from repo root):
+
+```sh
+encore gen client --lang openapi --output "openapi.json"
+npx openapi-typescript "openapi.json" -o "ui/src/lib/api-types.ts"
+```
+
+## Ingestor Daemon (Rust)
+
+The Rust side is moving toward focused ingest/infra duties:
+
+- OTLP and ingestion-related runtime paths
+- local daemon lifecycle/config utilities
+- infrastructure-specific processing
+
+It is optional for most product UI/API changes.
+
+## Full System Architecture
+
+```text
+Your App / SDKs
+      |
+      v
+Traceway API (Encore, backend/app)  <---->  UI (SvelteKit, ui/)
+      |
+      +----> Postgres (primary source of truth)
+      |
+      +----> Turbopuffer (secondary search index)
+      |
+      +----> Optional Rust ingest/infra services
+```
+
+## SDKs
+
+- Python: `sdk/python/`
+- TypeScript: `sdk/typescript/`
 
 ## License
 
