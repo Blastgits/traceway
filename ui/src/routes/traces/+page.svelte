@@ -225,7 +225,7 @@ with client.trace("summarize-doc") as t:
 	});
 </script>
 
-<div class="max-w-[1160px] mx-auto space-y-4">
+<div class="app-shell-wide space-y-4">
 	{#if loading}
 		<div class="text-text-muted text-sm text-center py-8">Loading...</div>
 	{:else if traces.length === 0}

@@ -39,6 +39,7 @@
 		return n.toString();
 	}
 
+
 	async function startCheckout(plan: string) {
 		if (plan !== 'pro' && plan !== 'team') return;
 		checkoutLoading = plan;
@@ -70,16 +71,18 @@
 		if (params.get('checkout') === 'success') {
 			// Refresh org data to get updated plan
 			setTimeout(async () => {
-				try { org = await getOrg(); } catch {}
+				try {
+					org = await getOrg();
+				} catch {}
 			}, 2000);
 		}
 	});
 </script>
 
-<div class="w-full space-y-6">
+<div class="w-full space-y-5">
 	<div>
-		<h1 class="text-xl font-semibold tracking-tight">Billing</h1>
-		<p class="text-text-muted text-sm mt-1">Manage your plan and usage.</p>
+		<h1 class="text-lg font-semibold tracking-tight">Billing</h1>
+		<p class="text-text-muted text-[12px] mt-0.5">Manage your plan and usage.</p>
 	</div>
 
 	{#if error}
@@ -91,48 +94,47 @@
 	{#if loading}
 		<div class="text-text-muted text-sm py-8 text-center">Loading...</div>
 	{:else if org}
-		<div class="grid grid-cols-1 lg:grid-cols-[170px_minmax(0,1fr)] gap-4 items-start">
+		<div class="grid grid-cols-1 lg:grid-cols-[160px_minmax(0,1fr)] gap-3.5 items-start">
 			<aside class="hidden lg:block">
-				<div class="app-toolbar-shell rounded-xl p-2 space-y-1 sticky top-18">
-					<div class="px-2 py-1.5 text-xs rounded-lg border border-border/70 bg-bg-tertiary/60 text-text">Plan &amp; Billing</div>
-					<div class="px-2 py-1.5 text-xs text-text-muted">Usage</div>
+				<div class="app-toolbar-shell rounded-xl p-1.5 space-y-0.5 sticky top-18">
+					<div class="px-2 py-1 text-[11px] rounded-md border border-border/70 bg-bg-tertiary/60 text-text">Plan &amp; Billing</div>
 				</div>
 			</aside>
 
-			<div class="space-y-4">
-				<div class="table-float p-4">
+			<div class="space-y-3.5">
+				<div class="table-float p-3.5">
 					<div class="flex items-center justify-between gap-4">
 						<div>
-							<div class="text-xs text-text-muted uppercase tracking-wide">Current plan</div>
-							<div class="text-2xl font-semibold text-text capitalize mt-0.5">{org.plan}</div>
+							<div class="text-[11px] text-text-muted uppercase tracking-wide">Current plan</div>
+							<div class="text-[1.65rem] leading-none font-semibold text-text capitalize mt-0.5">{org.plan}</div>
 						</div>
-						<div class="grid grid-cols-3 gap-5 text-right">
+						<div class="grid grid-cols-3 gap-4 text-right">
 							<div>
 								<div class="text-[11px] text-text-muted">Capacity</div>
-								<div class="text-xs text-text-secondary mt-0.5">{formatNumber(org.plan_limits.spans_per_month)} spans/mo</div>
+								<div class="text-[11px] text-text-secondary mt-0.5">{formatNumber(org.plan_limits.spans_per_month)} spans/mo</div>
 							</div>
 							<div>
 								<div class="text-[11px] text-text-muted">Retention</div>
-								<div class="text-xs text-text-secondary mt-0.5">{org.plan_limits.retention_days} days</div>
+								<div class="text-[11px] text-text-secondary mt-0.5">{org.plan_limits.retention_days} days</div>
 							</div>
 							<div>
 								<div class="text-[11px] text-text-muted">Team</div>
-								<div class="text-xs text-text-secondary mt-0.5">{org.plan_limits.max_team_members} members</div>
+								<div class="text-[11px] text-text-secondary mt-0.5">{org.plan_limits.max_team_members} members</div>
 							</div>
 						</div>
 					</div>
 				</div>
 
-				<div class="grid grid-cols-1 xl:grid-cols-3 gap-3">
+				<div class="grid grid-cols-1 xl:grid-cols-3 gap-2.5">
 					{#each plans as plan}
 						{@const isCurrent = org.plan === plan.id}
-						<section class="table-float p-4 space-y-3 border {isCurrent ? 'border-accent/65' : ''}">
+						<section class="table-float p-3.5 space-y-2.5 border {isCurrent ? 'border-accent/65' : ''}">
 							<div class="flex items-start justify-between gap-2">
 								<div>
-									<div class="text-sm font-semibold text-text">{plan.name}</div>
+									<div class="text-[15px] font-semibold text-text">{plan.name}</div>
 									<div class="mt-1">
-										<span class="text-3xl font-semibold text-text">{plan.price}</span>
-										<span class="text-sm text-text-muted">{plan.period}</span>
+										<span class="text-[2rem] leading-none font-semibold text-text">{plan.price}</span>
+										<span class="text-[13px] text-text-muted">{plan.period}</span>
 									</div>
 								</div>
 								{#if !isCurrent && plan.id !== 'free'}
@@ -140,9 +142,9 @@
 								{/if}
 							</div>
 
-							<ul class="space-y-1.5 min-h-[145px]">
+							<ul class="space-y-1.5 min-h-[132px]">
 								{#each plan.features as feature}
-									<li class="flex items-start gap-2 text-sm text-text-secondary">
+									<li class="flex items-start gap-2 text-[14px] text-text-secondary">
 										<svg class="w-4 h-4 shrink-0 mt-0.5 text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 											<path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
 										</svg>
@@ -152,14 +154,14 @@
 							</ul>
 
 							{#if isCurrent}
-								<div class="text-center text-xs text-text py-2 border border-border/70 rounded-lg bg-bg-tertiary/50">Current plan</div>
+								<div class="text-center text-[11px] text-text py-1.5 border border-border/70 rounded-lg bg-bg-tertiary/50">Current plan</div>
 							{:else if plan.id === 'free'}
-								<div class="h-9"></div>
+								<div class="h-8"></div>
 							{:else}
 								<button
 									onclick={() => startCheckout(plan.id)}
 									disabled={!!checkoutLoading}
-									class="block w-full text-center px-4 py-2 text-sm bg-accent text-bg font-semibold rounded-lg hover:bg-accent/85 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+									class="block w-full text-center px-3.5 py-1.5 text-[13px] bg-accent text-bg font-semibold rounded-lg hover:bg-accent/85 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
 								>
 									{checkoutLoading === plan.id ? 'Redirecting...' : `Upgrade to ${plan.name}`}
 								</button>

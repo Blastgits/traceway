@@ -133,7 +133,7 @@
 	}
 </script>
 
-<div class="max-w-[1160px] mx-auto space-y-4">
+<div class="app-shell-wide space-y-4">
 	<div class="grid grid-cols-1 lg:grid-cols-[170px_minmax(0,1fr)] gap-4 items-start">
 		<aside class="hidden lg:block">
 			<div class="app-toolbar-shell rounded-xl p-2 space-y-1 sticky top-18">

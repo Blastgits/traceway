@@ -381,8 +381,8 @@
 	<!-- Backdrop -->
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<!-- svelte-ignore a11y_click_events_have_key_events -->
-	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onclick={(e) => { if (e.target === e.currentTarget) closeModal(); }}>
-		<div class="bg-bg-secondary border border-border rounded-xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+	<div class="fixed inset-0 z-[140] flex items-center justify-center bg-black/65 backdrop-blur-sm p-4" onclick={(e) => { if (e.target === e.currentTarget) closeModal(); }}>
+		<div class="bg-bg-secondary border border-border rounded-xl shadow-2xl w-full max-w-md overflow-hidden max-h-[88vh] overflow-y-auto">
 			<!-- Header -->
 			<div class="px-5 py-4 border-b border-border flex items-center justify-between">
 				<h2 class="text-base font-semibold text-text">Add API key</h2>

@@ -520,7 +520,7 @@
 	}
 </script>
 
-<div class="max-w-[1160px] mx-auto space-y-4">
+<div class="app-shell-wide space-y-4">
 	<!-- Header -->
 	<div class="flex items-center gap-2">
 		<a href="/datasets" class="text-text-secondary hover:text-text text-sm">&larr; Datasets</a>

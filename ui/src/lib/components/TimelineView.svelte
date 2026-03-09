@@ -16,9 +16,9 @@
 	} = $props();
 
 	// ── Constants ──────────────────────────────────────────────────────
-	const ROW_HEIGHT = 36;
+	const ROW_HEIGHT = 42;
 	const INDENT_PX = 16;
-	const LABEL_WIDTH = 260; // px for the left label column
+	const LABEL_WIDTH = 320;
 	const MIN_BAR_PX = 3;
 
 	// ── Zoom ──────────────────────────────────────────────────────────
@@ -181,26 +181,26 @@
 	}
 </script>
 
-<div class="flex flex-col h-full min-h-0 bg-bg/10">
+<div class="flex flex-col h-full min-h-0 bg-bg/10 text-[13px]">
 	<!-- Toolbar -->
-	<div class="flex items-center gap-2 px-3 py-2 border-b border-border/70 shrink-0 bg-bg-secondary/45">
-		<span class="text-[11px] text-text-muted">{rows.length} spans</span>
+	<div class="flex items-center gap-2 px-3 py-2.5 border-b border-border/70 shrink-0 bg-bg-secondary/45">
+		<span class="text-[12px] text-text-muted">{rows.length} spans</span>
 		<div class="flex-1"></div>
-		<div class="flex items-center gap-0.5 text-[10px]">
-			<button class="px-1.5 py-0.5 text-text-muted hover:text-text rounded hover:bg-bg-tertiary transition-colors" onclick={zoomOut}>-</button>
-			<button class="px-1.5 py-0.5 text-text-muted hover:text-text rounded hover:bg-bg-tertiary transition-colors text-[9px]" onclick={zoomReset}>{Math.round(zoom * 100)}%</button>
-			<button class="px-1.5 py-0.5 text-text-muted hover:text-text rounded hover:bg-bg-tertiary transition-colors" onclick={zoomIn}>+</button>
+		<div class="flex items-center gap-0.5 text-[11px]">
+			<button class="px-2 py-0.5 text-text-muted hover:text-text rounded hover:bg-bg-tertiary transition-colors" onclick={zoomOut}>-</button>
+			<button class="px-2 py-0.5 text-text-muted hover:text-text rounded hover:bg-bg-tertiary transition-colors text-[11px]" onclick={zoomReset}>{Math.round(zoom * 100)}%</button>
+			<button class="px-2 py-0.5 text-text-muted hover:text-text rounded hover:bg-bg-tertiary transition-colors" onclick={zoomIn}>+</button>
 		</div>
 	</div>
 
 	<!-- Time axis -->
-	<div class="flex shrink-0 border-b border-border/70 bg-bg-secondary/35" style="height: 26px">
+	<div class="flex shrink-0 border-b border-border/70 bg-bg-secondary/35" style="height: 30px">
 		<div class="shrink-0 sticky left-0 z-20 bg-bg-secondary/85 border-r border-border/60" style="width: {LABEL_WIDTH}px"></div>
 		<div class="flex-1 relative min-w-0 overflow-hidden">
 			<div class="relative h-full" style="width: {zoom * 100}%">
 				{#each ticks as tick}
 					<div class="absolute top-0 bottom-0 border-l border-border/40" style="left: {tick.pct}%">
-						<span class="absolute top-1 left-1 text-[9px] text-text-muted/80 whitespace-nowrap">{tick.label}</span>
+						<span class="absolute top-1 left-1 text-[11px] text-text-muted/80 whitespace-nowrap">{tick.label}</span>
 					</div>
 				{/each}
 			</div>
@@ -220,7 +220,7 @@
 		}}
 	>
 		{#if rows.length === 0}
-			<div class="text-text-muted text-xs text-center py-12">No spans</div>
+			<div class="text-text-muted text-[13px] text-center py-12">No spans</div>
 		{:else}
 			{#each rows as row (row.span.id)}
 				{@const s = row.span}
@@ -240,7 +240,7 @@
 					>
 						<span class="w-1.5 h-1.5 rounded-full shrink-0 {statusDotClass(s)}"></span>
 						<div class="shrink-0 opacity-60"><SpanKindIcon span={s} /></div>
-						<span class="text-[11px] text-text truncate font-medium">{s.name}</span>
+						<span class="text-[13px] text-text truncate font-medium">{s.name}</span>
 					</div>
 
 					<!-- Bar area -->
@@ -262,7 +262,7 @@
 								onmouseleave={hideTooltip}
 							>
 								<!-- Inline label (only when bar is wide enough) -->
-								<span class="text-[9px] text-text font-medium truncate px-1.5 whitespace-nowrap opacity-90">
+								<span class="text-[11px] text-text font-medium truncate px-1.5 whitespace-nowrap opacity-90">
 									{formatDuration(row.durationMs)}
 									{#if tokens}
 										<span class="text-text-muted/70 ml-1">{tokens}tok</span>

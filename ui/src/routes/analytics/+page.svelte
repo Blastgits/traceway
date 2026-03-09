@@ -254,7 +254,7 @@
 <svelte:window onclick={() => { showIntervalDropdown = false; }} />
 
 <!-- Dashboard header bar -->
-<div class="max-w-[1160px] mx-auto app-toolbar-shell rounded-xl p-2 flex items-center gap-2 mb-5 flex-wrap">
+<div class="app-shell-wide app-toolbar-shell rounded-xl p-2.5 flex items-center gap-2.5 mb-5 flex-wrap">
 	<div class="flex items-center gap-2 px-2 py-1 rounded-md bg-bg-tertiary/35 border border-border/55">
 		<svg class="w-4 h-4 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
 			<path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25A2.25 2.25 0 0 1 13.5 18v-2.25Z" />
@@ -336,7 +336,7 @@
 
 <!-- Layout editor panel -->
 {#if showLayoutEditor}
-	<div class="max-w-[1160px] mx-auto bg-bg-secondary border border-border rounded-lg p-4 mb-5 space-y-3 animate-slide-down">
+	<div class="app-shell-wide bg-bg-secondary border border-border rounded-lg p-4 mb-5 space-y-3 animate-slide-down">
 		<div class="flex items-center justify-between">
 			<span class="text-text text-sm font-medium">Configure Layout</span>
 			<button
@@ -415,24 +415,24 @@
 {/if}
 
 {#if loading}
-	<div class="max-w-[1160px] mx-auto text-text-muted text-sm py-16 text-center">
+	<div class="app-shell-wide text-text-muted text-sm py-16 text-center">
 		<div class="inline-flex items-center gap-2">
 			<div class="w-4 h-4 border-2 border-accent/30 border-t-accent rounded-full animate-spin"></div>
 			Loading analytics...
 		</div>
 	</div>
 {:else if error}
-	<div class="max-w-[1160px] mx-auto bg-bg-secondary border border-border rounded-lg p-8 text-center">
+	<div class="app-shell-wide bg-bg-secondary border border-border rounded-lg p-8 text-center">
 		<p class="text-text-muted text-sm">{error}</p>
 	</div>
 {:else if !summary || summary.total_spans === 0}
-	<div class="max-w-[1160px] mx-auto bg-bg-secondary border border-border rounded-lg p-8 text-center space-y-2">
+	<div class="app-shell-wide bg-bg-secondary border border-border rounded-lg p-8 text-center space-y-2">
 		<div class="text-text-muted text-sm">No data yet</div>
 		<div class="text-text-muted/60 text-xs">Create some traces to see analytics.</div>
 	</div>
 {:else}
 	<!-- Dashboard grid -->
-	<div class="max-w-[1160px] mx-auto grid grid-cols-6 gap-4 auto-rows-auto">
+	<div class="app-shell-wide grid grid-cols-6 gap-4 auto-rows-auto">
 		{#each visibleCards as card, idx (card.id)}
 			{#if card.id === 'top_model_tokens'}
 				<DashboardCard title="Top model tokens" colSpan={card.col} rowSpan={card.row} accent={cardAccents[card.id]} index={idx}>

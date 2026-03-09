@@ -87,7 +87,7 @@
 	});
 </script>
 
-<div class="max-w-[1160px] mx-auto space-y-5">
+<div class="app-shell-wide space-y-5">
 	<h1 class="text-xl font-semibold tracking-tight">Dashboard</h1>
 
 	{#if !loaded}

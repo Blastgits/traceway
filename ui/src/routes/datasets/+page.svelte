@@ -79,7 +79,7 @@
 	}
 </script>
 
-<div class="max-w-[1160px] mx-auto space-y-4">
+<div class="app-shell-wide space-y-4">
 	<div class="flex items-center justify-between">
 		<h1 class="text-xl font-semibold tracking-tight">Datasets</h1>
 		<button

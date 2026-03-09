@@ -287,6 +287,18 @@
 	type FilterPicker = 'kind' | 'status' | 'time' | 'duration' | 'tokens' | 'cost' | 'model' | 'provider';
 	let activePicker: FilterPicker | null = $state(null);
 	let pickerSearch = $state('');
+	let pickerMenuOpen = $state(false);
+
+	const pickerMenuItems: Array<{ key: FilterPicker; label: string; note: string }> = [
+		{ key: 'kind', label: 'Kind', note: 'llm_call, fs_read, custom' },
+		{ key: 'status', label: 'Status', note: 'running, completed, failed' },
+		{ key: 'time', label: 'Time', note: 'last 5m, 1h, 24h, 7d' },
+		{ key: 'model', label: 'Model', note: 'filter by model name' },
+		{ key: 'provider', label: 'Provider', note: 'openai, anthropic, ...' },
+		{ key: 'duration', label: 'Latency', note: '>200ms, >1s, >5s' },
+		{ key: 'tokens', label: 'Tokens', note: '>1k, >5k, >10k' },
+		{ key: 'cost', label: 'Cost', note: '>$0.001, >$0.01, >$0.10' }
+	];
 
 	interface PickerOption {
 		label: string;
@@ -356,6 +368,11 @@
 		activePicker = null;
 		pickerSearch = '';
 		applyDsl();
+	}
+
+	function openPicker(key: FilterPicker) {
+		activePicker = key;
+		pickerMenuOpen = false;
 	}
 
 	// ─── Grouped view ──────────────────────────────────────────────────
@@ -565,7 +582,8 @@
 	function globalKeydown(e: KeyboardEvent) {
 		if (e.key === '/' && document.activeElement?.tagName !== 'INPUT' && document.activeElement?.tagName !== 'TEXTAREA') {
 			e.preventDefault();
-			searchInputEl?.focus();
+			pickerMenuOpen = !pickerMenuOpen;
+			if (!pickerMenuOpen) searchInputEl?.focus();
 		}
 	}
 
@@ -634,6 +652,7 @@
 		} else if (e.key === 'Escape') {
 			activePicker = null;
 			pickerSearch = '';
+			pickerMenuOpen = false;
 			searchFocused = false;
 			searchInputEl?.blur();
 		} else {
@@ -1092,6 +1111,23 @@
 	<!-- Floating command bar -->
 	<div class="fixed left-1/2 bottom-3 -translate-x-1/2 z-40 w-[min(1080px,calc(100vw-1.25rem))]">
 		<div class="relative query-command-shell rounded-xl p-2 sm:p-2.5" role="search" aria-label="Trace query command bar">
+			{#if pickerMenuOpen}
+				<div class="absolute left-0 bottom-full mb-2 w-72 query-float-strong rounded-xl border border-border/70 shadow-xl overflow-hidden z-30">
+					<div class="px-3 py-2 border-b border-border/60 text-[11px] text-text-muted uppercase tracking-[0.12em]">Add filter</div>
+					<div class="max-h-72 overflow-y-auto p-1.5 space-y-0.5">
+						{#each pickerMenuItems as item}
+							<button
+								class="w-full flex items-center justify-between px-2.5 py-2 rounded-lg hover:bg-bg-tertiary/70 transition-colors text-left"
+								onmousedown={() => openPicker(item.key)}
+							>
+								<span class="text-[13px] text-text font-medium">{item.label}</span>
+								<span class="text-[11px] text-text-muted">{item.note}</span>
+							</button>
+						{/each}
+					</div>
+				</div>
+			{/if}
+
 			{#if activePicker}
 				<div class="absolute left-0 right-0 bottom-full mb-2 query-float-strong rounded-xl border border-border/70 shadow-xl overflow-hidden">
 					<div class="px-3 py-2 border-b border-border/60 flex items-center gap-2">
@@ -1159,14 +1195,12 @@
 			{/if}
 
 			<div class="flex items-center gap-1.5 flex-wrap">
-				<button class="query-chip" onclick={() => (activePicker = 'kind')}>Kind</button>
-				<button class="query-chip" onclick={() => (activePicker = 'status')}>Status</button>
-				<button class="query-chip" onclick={() => (activePicker = 'time')}>Time</button>
-				<button class="query-chip hidden sm:inline-flex" onclick={() => (activePicker = 'model')}>Model</button>
-				<button class="query-chip hidden sm:inline-flex" onclick={() => (activePicker = 'provider')}>Provider</button>
-				<button class="query-chip hidden md:inline-flex" onclick={() => (activePicker = 'duration')}>Latency</button>
-				<button class="query-chip hidden md:inline-flex" onclick={() => (activePicker = 'tokens')}>Tokens</button>
-				<button class="query-chip hidden md:inline-flex" onclick={() => (activePicker = 'cost')}>Cost</button>
+				<button class="query-chip" onclick={() => (pickerMenuOpen = !pickerMenuOpen)}>
+					<span class="text-text-secondary">Filter by</span>
+					<svg class="w-3.5 h-3.5 text-text-muted transition-transform {pickerMenuOpen ? 'rotate-180' : ''}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+						<path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+					</svg>
+				</button>
 
 				<div class="flex items-center flex-1 rounded-lg border border-border/40 bg-bg/30 min-w-[240px] transition-all duration-200 focus-within:border-accent/55 focus-within:bg-bg/40">
 					<div class="pl-3 pr-2 text-text-muted/80">

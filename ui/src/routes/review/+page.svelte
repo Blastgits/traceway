@@ -231,7 +231,7 @@
 	}
 </script>
 
-<div class="max-w-[1160px] mx-auto space-y-4">
+<div class="app-shell-wide space-y-4">
 	<!-- Header -->
 	<div class="flex items-center justify-between">
 		<div>
