@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { acceptInvite } from '$lib/api';
-	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
+	import TracewayWordmark from '$lib/components/TracewayWordmark.svelte';
 
 	let name = $state('');
 	let password = $state('');
@@ -48,7 +48,9 @@
 <div class="min-h-screen flex items-center justify-center bg-bg">
 	<div class="w-full max-w-sm space-y-6">
 		<div class="text-center">
-			<h1 class="text-2xl font-bold text-text">Traceway</h1>
+			<a href="/" class="inline-flex items-center justify-center px-3 h-10 rounded-lg border border-border/65 bg-bg-secondary/65 hover:border-border transition-colors">
+				<TracewayWordmark className="h-4.5 w-auto text-text" />
+			</a>
 			<p class="text-text-muted text-sm mt-1">Accept your invitation</p>
 		</div>
 

@@ -19,15 +19,15 @@
 	} = $props();
 
 	// ── Constants ──────────────────────────────────────────────────────
-	const SPAN_ROW_HEIGHT = 36;
-	const PREVIEW_LINE_HEIGHT = 18; // ~11px text + leading
+	const SPAN_ROW_HEIGHT = 40;
+	const PREVIEW_LINE_HEIGHT = 19;
 	const PREVIEW_PADDING = 8; // py-1 top+bottom
 	const OVERSCAN = 10;
 	const INDENT_PX = 20;
 
 	/** Estimate preview height based on text length (rough char-per-line estimate) */
 	function previewHeight(text: string): number {
-		const charsPerLine = 60; // rough estimate for the available width
+		const charsPerLine = 72;
 		const lines = Math.min(3, Math.max(1, Math.ceil(text.length / charsPerLine)));
 		return lines * PREVIEW_LINE_HEIGHT + PREVIEW_PADDING;
 	}
@@ -356,15 +356,15 @@
 
 <div class="flex flex-col h-full min-h-0 bg-transparent">
 	<!-- Toolbar -->
-	<div class="flex items-center gap-2 px-3 py-2 border-b border-border/55 shrink-0 bg-bg-secondary/30 backdrop-blur-sm">
+	<div class="flex items-center gap-2 px-3 py-2.5 border-b border-border/55 shrink-0 bg-bg-secondary/30 backdrop-blur-sm">
 		{#if viewMode === 'tree' || viewMode === 'flat'}
-			<span class="text-[10px] uppercase tracking-[0.12em] text-text-muted">{flatTree.filter(n => n.type === 'span').length} spans</span>
+			<span class="text-[11px] uppercase tracking-[0.1em] text-text-muted">{flatTree.filter(n => n.type === 'span').length} spans</span>
 		{/if}
 
 		<div class="flex-1"></div>
 
 		{#if viewMode === 'tree'}
-			<div class="flex items-center gap-0.5 text-[10px] text-text-muted bg-bg-tertiary/35 border border-border/50 rounded-md px-1 py-0.5">
+			<div class="flex items-center gap-0.5 text-[11px] text-text-muted bg-bg-tertiary/35 border border-border/50 rounded-md px-1.5 py-0.5">
 				<button class="hover:text-text transition-colors duration-150 px-1" onclick={expandAll}>expand</button>
 				<span class="text-border">/</span>
 				<button class="hover:text-text transition-colors duration-150 px-1" onclick={collapseAll}>collapse</button>
@@ -372,7 +372,7 @@
 		{/if}
 
 		<!-- View mode toggle -->
-		<div class="flex items-center bg-bg-tertiary/45 border border-border/55 rounded-md text-[10px] p-0.5 backdrop-blur-sm">
+		<div class="flex items-center bg-bg-tertiary/45 border border-border/55 rounded-md text-[11px] p-0.5 backdrop-blur-sm">
 			{#each (['tree', 'flat', 'timeline', 'reader'] as const) as mode}
 				<button
 					class="px-2 py-0.5 rounded transition-colors duration-150 capitalize {viewMode === mode ? 'bg-accent/20 text-accent border border-accent/35' : 'text-text-muted hover:text-text'}"
@@ -412,8 +412,8 @@
 							onclick={() => onSelect?.(s)}
 							onkeydown={(e: KeyboardEvent) => { if (e.key === 'Enter') onSelect?.(s); }}
 						>
-							<div class="overflow-hidden pr-3" style="padding-left: {(node.depth + (viewMode === 'tree' ? 1 : 0)) * INDENT_PX + 46}px; padding-top: 2px">
-								<p class="text-[11px] text-text-muted/80 leading-[18px] line-clamp-3">{node.text}</p>
+							<div class="overflow-hidden pr-3" style="padding-left: {(node.depth + (viewMode === 'tree' ? 1 : 0)) * INDENT_PX + 46}px; padding-top: 3px">
+								<p class="text-[12px] text-text-muted/82 leading-[19px] line-clamp-3">{node.text}</p>
 							</div>
 						</div>
 					{:else}
@@ -435,7 +435,7 @@
 							onkeydown={(e: KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect?.(s); } }}
 						>
 							<!-- Span info -->
-							<div class="flex items-center gap-1.5 flex-1 px-2 overflow-hidden min-w-0">
+							<div class="flex items-center gap-1.5 flex-1 px-2.5 overflow-hidden min-w-0">
 								<!-- Indent + collapse -->
 								{#if viewMode === 'tree'}
 									<div class="flex items-center shrink-0" style="width: {node.depth * INDENT_PX + 20}px">
@@ -468,32 +468,32 @@
 								</div>
 
 								<!-- Name -->
-								<span class="text-text truncate text-xs font-medium">{s.name}</span>
+								<span class="text-text truncate text-[13px] font-medium">{s.name}</span>
 
 								<!-- Inline badges -->
 								{#if model}
-									<span class="shrink-0 text-purple-400 text-[10px] bg-purple-400/10 border border-purple-400/25 rounded px-1 py-px">{model}</span>
+									<span class="shrink-0 text-purple-400 text-[11px] bg-purple-400/10 border border-purple-400/25 rounded px-1 py-px">{model}</span>
 								{/if}
 								{#if tokens}
-									<span class="shrink-0 text-text-muted text-[10px] bg-bg-tertiary/45 border border-border/45 rounded px-1 py-px">{tokens}tok</span>
+									<span class="shrink-0 text-text-muted text-[11px] bg-bg-tertiary/45 border border-border/45 rounded px-1 py-px">{tokens}tok</span>
 								{/if}
 								{#if cost}
-									<span class="shrink-0 text-success text-[10px]">{cost}</span>
+									<span class="shrink-0 text-success text-[11px]">{cost}</span>
 								{/if}
 								{#if bytes}
-									<span class="shrink-0 text-text-muted text-[10px] bg-bg-tertiary/45 border border-border/45 rounded px-1 py-px">{bytes}</span>
+									<span class="shrink-0 text-text-muted text-[11px] bg-bg-tertiary/45 border border-border/45 rounded px-1 py-px">{bytes}</span>
 								{/if}
 
 								<!-- Collapsed count -->
 								{#if node.hasChildren && collapsed.has(s.id)}
-									<span class="shrink-0 text-text-muted text-[10px] bg-bg-tertiary rounded px-1.5 py-px">+{node.descendantCount}</span>
+									<span class="shrink-0 text-text-muted text-[11px] bg-bg-tertiary rounded px-1.5 py-px">+{node.descendantCount}</span>
 								{/if}
 							</div>
 
 							<!-- Duration / offset (right side) -->
-							<div class="shrink-0 flex flex-col items-end pr-3 text-right min-w-16">
-								<span class="text-xs text-text-secondary font-mono">{formatDuration(duration)}</span>
-								<span class="text-[10px] text-text-muted font-mono">{relativeOffset(s)}</span>
+							<div class="shrink-0 flex flex-col items-end pr-3 text-right min-w-18">
+								<span class="text-[12px] text-text-secondary font-mono">{formatDuration(duration)}</span>
+								<span class="text-[11px] text-text-muted font-mono">{relativeOffset(s)}</span>
 							</div>
 						</div>
 					{/if}

@@ -339,9 +339,9 @@
 	{@const duration = spanDurationMs(span)}
 	{@const error = spanError(span)}
 
-	<div class="flex flex-col h-full min-h-0">
+	<div class="flex flex-col h-full min-h-0 text-[13px]">
 		<!-- Header -->
-		<div class="px-4 py-3 border-b border-border/55 shrink-0 space-y-3 bg-bg-secondary/20 backdrop-blur-sm">
+		<div class="px-4 py-3.5 border-b border-border/55 shrink-0 space-y-3 bg-bg-secondary/20 backdrop-blur-sm">
 			<!-- Row 1: name + status -->
 			<div class="flex items-center gap-2">
 				<SpanKindIcon {span} />
@@ -350,59 +350,59 @@
 			</div>
 
 			<!-- Row 2: metadata badges -->
-			<div class="flex items-center gap-2 flex-wrap bg-bg-tertiary/30 rounded-xl border border-border/45 px-2.5 py-2">
+			<div class="flex items-center gap-2 flex-wrap bg-bg-tertiary/30 rounded-xl border border-border/45 px-2.5 py-2.5">
 				<!-- Duration badge -->
-				<span class="inline-flex items-center gap-1 rounded px-2 py-0.5 text-[11px] bg-bg-tertiary border border-border text-text-secondary">
+				<span class="inline-flex items-center gap-1 rounded px-2 py-0.5 text-[12px] bg-bg-tertiary border border-border text-text-secondary">
 					<svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
 					{formatDuration(duration)}
 				</span>
 
 				<!-- Started at -->
-				<span class="text-[11px] text-text-muted font-mono bg-bg/35 rounded px-1.5 py-0.5 border border-border/30">
+				<span class="text-[12px] text-text-muted font-mono bg-bg/35 rounded px-1.5 py-0.5 border border-border/30">
 					{new Date(spanStartedAt(span)).toLocaleTimeString()}
 				</span>
 
 				<!-- Span ID -->
-				<span class="text-[11px] text-text-muted font-mono bg-bg/35 rounded px-1.5 py-0.5 border border-border/30">
+				<span class="text-[12px] text-text-muted font-mono bg-bg/35 rounded px-1.5 py-0.5 border border-border/30">
 					{shortId(span.id)}
 				</span>
 
 				<!-- Kind-specific badges -->
 				{#if span.kind?.type === 'llm_call'}
-					<span class="inline-flex items-center gap-1 rounded px-2 py-0.5 text-[11px] bg-purple-400/10 border border-purple-400/20 text-purple-400">
+					<span class="inline-flex items-center gap-1 rounded px-2 py-0.5 text-[12px] bg-purple-400/10 border border-purple-400/20 text-purple-400">
 						{span.kind.model}
 					</span>
 					{#if span.kind.input_tokens != null || span.kind.output_tokens != null}
-						<span class="inline-flex items-center gap-1 rounded px-2 py-0.5 text-[11px] bg-bg-tertiary border border-border text-text-secondary">
+						<span class="inline-flex items-center gap-1 rounded px-2 py-0.5 text-[12px] bg-bg-tertiary border border-border text-text-secondary">
 							{#if span.kind.input_tokens != null}{span.kind.input_tokens.toLocaleString()} in{/if}
 							{#if span.kind.input_tokens != null && span.kind.output_tokens != null} / {/if}
 							{#if span.kind.output_tokens != null}{span.kind.output_tokens.toLocaleString()} out{/if}
 						</span>
 					{/if}
 					{#if span.kind.cost != null}
-						<span class="inline-flex items-center rounded px-2 py-0.5 text-[11px] bg-success/10 border border-success/20 text-success">
+						<span class="inline-flex items-center rounded px-2 py-0.5 text-[12px] bg-success/10 border border-success/20 text-success">
 							${span.kind.cost.toFixed(4)}
 						</span>
 					{/if}
 					{#if span.kind.provider}
-						<span class="text-[11px] text-text-muted bg-bg/35 rounded px-1.5 py-0.5 border border-border/30">{span.kind.provider}</span>
+						<span class="text-[12px] text-text-muted bg-bg/35 rounded px-1.5 py-0.5 border border-border/30">{span.kind.provider}</span>
 					{/if}
 				{:else if span.kind?.type === 'fs_read' || span.kind?.type === 'fs_write'}
-					<span class="inline-flex items-center gap-1 rounded px-2 py-0.5 text-[11px] bg-bg-tertiary border border-border text-text-secondary font-mono truncate max-w-64">
+					<span class="inline-flex items-center gap-1 rounded px-2 py-0.5 text-[12px] bg-bg-tertiary border border-border text-text-secondary font-mono truncate max-w-64">
 						{span.kind.path}
 					</span>
 				{/if}
 			</div>
 
 			<!-- Row 3: action buttons -->
-			<div class="flex items-center gap-2 flex-wrap rounded-xl border border-border/50 bg-bg-tertiary/25 px-2 py-2">
+			<div class="flex items-center gap-2 flex-wrap rounded-xl border border-border/50 bg-bg-tertiary/25 px-2 py-2.5">
 				{#if status === 'running'}
 					<button
-						class="px-2.5 py-1 text-[11px] bg-success/10 text-success border border-success/20 rounded-lg hover:bg-success/20 transition-colors duration-150"
+					class="px-2.5 py-1 text-[12px] bg-success/10 text-success border border-success/20 rounded-lg hover:bg-success/20 transition-colors duration-150"
 						onclick={() => { showCompleteForm = !showCompleteForm; showFailForm = false; }}
 					>Complete</button>
 					<button
-						class="px-2.5 py-1 text-[11px] bg-danger/10 text-danger border border-danger/20 rounded-lg hover:bg-danger/20 transition-colors duration-150"
+					class="px-2.5 py-1 text-[12px] bg-danger/10 text-danger border border-danger/20 rounded-lg hover:bg-danger/20 transition-colors duration-150"
 						onclick={() => { showFailForm = !showFailForm; showCompleteForm = false; }}
 					>Fail</button>
 				{/if}
@@ -410,7 +410,7 @@
 				<!-- Export to Dataset -->
 				<div class="relative">
 					<button
-						class="px-2.5 py-1 text-[11px] bg-amber-400/10 text-amber-400 border border-amber-400/20 rounded-lg hover:bg-amber-400/20 transition-colors duration-150"
+					class="px-2.5 py-1 text-[12px] bg-amber-400/10 text-amber-400 border border-amber-400/20 rounded-lg hover:bg-amber-400/20 transition-colors duration-150"
 						onclick={openExportDropdown}
 					>Add to dataset</button>
 					{#if showExportDropdown}
@@ -436,7 +436,7 @@
 			<!-- Send to Review -->
 				<div class="relative">
 					<button
-						class="px-2.5 py-1 text-[11px] bg-warning/10 text-warning border border-warning/20 rounded-lg hover:bg-warning/20 transition-colors duration-150"
+					class="px-2.5 py-1 text-[12px] bg-warning/10 text-warning border border-warning/20 rounded-lg hover:bg-warning/20 transition-colors duration-150"
 						onclick={openReviewDropdown}
 					>Send to review</button>
 					{#if showReviewDropdown}
@@ -460,16 +460,16 @@
 				</div>
 
 			{#if exportSuccess}
-				<span class="text-[11px] text-success">{exportSuccess}</span>
+				<span class="text-[12px] text-success">{exportSuccess}</span>
 			{/if}
 			{#if reviewSuccess}
-				<span class="text-[11px] text-success">{reviewSuccess}</span>
+				<span class="text-[12px] text-success">{reviewSuccess}</span>
 			{/if}
 
 				<div class="flex-1"></div>
 
 				<button
-					class="px-2.5 py-1 text-[11px] transition-colors duration-150 border rounded-lg {confirmDeleteSpan ? 'bg-danger/10 text-danger border-danger/30 font-semibold' : 'text-text-muted border-border hover:text-danger hover:border-danger/30'}"
+				class="px-2.5 py-1 text-[12px] transition-colors duration-150 border rounded-lg {confirmDeleteSpan ? 'bg-danger/10 text-danger border-danger/30 font-semibold' : 'text-text-muted border-border hover:text-danger hover:border-danger/30'}"
 					onclick={handleDeleteSpan}
 				>{confirmDeleteSpan ? 'Confirm?' : 'Delete span'}</button>
 			</div>

@@ -7,6 +7,7 @@
 		{ href: '/settings', label: 'Settings' },
 		{ href: '/settings/team', label: 'Team' },
 		{ href: '/settings/api-keys', label: 'API Keys' },
+		{ href: '/settings/usage', label: 'Usage' },
 		{ href: '/settings/billing', label: 'Billing' }
 	];
 
@@ -16,7 +17,7 @@
 	}
 </script>
 
-<div class="max-w-[1160px] mx-auto space-y-4">
+<div class="app-shell-wide space-y-4">
 	<nav class="app-toolbar-shell rounded-xl p-2" aria-label="Settings sections">
 		<div class="flex items-center gap-2 overflow-x-auto pb-0.5">
 			{#each tabs as tab}

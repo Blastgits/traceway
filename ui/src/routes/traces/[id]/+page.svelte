@@ -115,7 +115,7 @@
 	let addingSpan = $state(false);
 
 	// Resizable split panel
-	let splitPercent = $state(40);
+	let splitPercent = $state(44);
 	let isDragging = $state(false);
 	let containerEl: HTMLDivElement | undefined = $state(undefined);
 
@@ -130,7 +130,7 @@
 		const rect = containerEl.getBoundingClientRect();
 		const x = e.clientX - rect.left;
 		const pct = (x / rect.width) * 100;
-		splitPercent = Math.max(20, Math.min(70, pct));
+		splitPercent = Math.max(28, Math.min(74, pct));
 	}
 
 	function onDividerPointerUp(e: PointerEvent) {
@@ -310,12 +310,12 @@
 	const parentOptions = $derived(spans.map((s) => ({ id: s.id, name: s.name })));
 </script>
 
-<div class="max-w-[1160px] mx-auto h-[calc(100vh-8rem)] flex flex-col gap-3">
+<div class="w-[min(1880px,calc(100vw-0.75rem))] mx-auto h-[calc(100vh-8rem)] flex flex-col gap-3">
 	<!-- Header -->
-	<div class="flex items-center gap-3 px-3.5 py-2 shrink-0 app-toolbar-shell rounded-xl">
-		<a href="/traces" class="text-text-secondary hover:text-text text-sm">&larr; Traces</a>
+	<div class="flex items-center gap-3 px-3.5 py-2.5 shrink-0 app-toolbar-shell rounded-xl">
+		<a href="/traces" class="text-text-secondary hover:text-text text-[13px]">&larr; Traces</a>
 		<span class="text-text-muted">/</span>
-		<h1 class="text-sm font-semibold font-mono">{shortId(traceId)}</h1>
+		<h1 class="text-[13px] font-semibold font-mono">{shortId(traceId)}</h1>
 
 		{#if !loading && spans.length > 0}
 			<span class="px-2 py-0.5 rounded text-xs border
@@ -326,7 +326,7 @@
 			</span>
 
 			<!-- Summary stats -->
-			<div class="flex items-center gap-1.5 text-xs text-text-secondary font-mono bg-bg-tertiary/35 rounded-md px-2 py-1 border border-border/45">
+			<div class="flex items-center gap-1.5 text-[12px] text-text-secondary font-mono bg-bg-tertiary/35 rounded-md px-2.5 py-1 border border-border/45">
 				{#if totalDuration !== null}
 					<span class="inline-flex items-center gap-1">
 						<svg class="w-3.5 h-3.5 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
@@ -353,17 +353,17 @@
 
 			<div class="flex-1"></div>
 			<button
-				class="px-3 py-1 text-xs bg-accent/10 text-accent border border-accent/20 rounded-lg hover:bg-accent/20 transition-colors duration-150"
+				class="px-3 py-1.5 text-[12px] bg-accent/10 text-accent border border-accent/20 rounded-lg hover:bg-accent/20 transition-colors duration-150"
 				onclick={() => { showAddSpan = !showAddSpan; if (!showAddSpan) newSpanParent = ''; }}
 			>
 				{showAddSpan ? 'Cancel' : '+ Span'}
 			</button>
 			<button
-				class="px-3 py-1 text-xs bg-bg-tertiary/70 text-text-secondary border border-border rounded-lg hover:text-text hover:bg-bg-tertiary transition-colors duration-150"
+				class="px-3 py-1.5 text-[12px] bg-bg-tertiary/70 text-text-secondary border border-border rounded-lg hover:text-text hover:bg-bg-tertiary transition-colors duration-150"
 				onclick={handleExportTrace}
 			>Export</button>
 			<button
-				class="px-3 py-1 text-xs transition-colors duration-150 border rounded-lg {confirmDeleteTrace ? 'bg-danger/10 text-danger border-danger/30 font-semibold' : 'bg-bg-tertiary/70 text-text-muted border-border hover:text-danger hover:border-danger/30'}"
+				class="px-3 py-1.5 text-[12px] transition-colors duration-150 border rounded-lg {confirmDeleteTrace ? 'bg-danger/10 text-danger border-danger/30 font-semibold' : 'bg-bg-tertiary/70 text-text-muted border-border hover:text-danger hover:border-danger/30'}"
 				onclick={handleDeleteTrace}
 			>{confirmDeleteTrace ? 'Confirm?' : 'Delete'}</button>
 		{/if}
@@ -447,9 +447,9 @@
 			class:select-none={isDragging}
 		>
 			<!-- Left panel: search + span tree -->
-			<div class="min-h-0 overflow-hidden flex flex-col table-float rounded-xl" style="width: {splitPercent}%">
+			<div class="min-h-0 min-w-[380px] overflow-hidden flex flex-col table-float rounded-xl" style="width: {splitPercent}%">
 				<div class="px-3 py-2 border-b border-border/55 bg-gradient-to-r from-bg-secondary/70 via-bg-secondary/45 to-transparent">
-					<p class="text-[10px] uppercase tracking-[0.16em] text-text-muted">Trace timeline</p>
+					<p class="text-[11px] uppercase tracking-[0.14em] text-text-muted">Trace timeline</p>
 				</div>
 				<!-- Search bar -->
 				<div class="relative shrink-0 border-b border-border/55 bg-bg-secondary/25">
@@ -464,7 +464,7 @@
 							onblur={() => setTimeout(() => searchFocused = false, 150)}
 							type="text"
 							placeholder="Search spans...  /"
-							class="flex-1 bg-transparent text-xs text-text placeholder:text-text-muted/50 focus:outline-none"
+							class="flex-1 bg-transparent text-[13px] text-text placeholder:text-text-muted/50 focus:outline-none"
 						/>
 						{#if searchQuery}
 							<button
@@ -487,8 +487,8 @@
 									class="w-full flex items-center gap-2 px-3 py-1.5 text-left hover:bg-bg-tertiary/85 transition-colors duration-150"
 									onmousedown={() => applySuggestion(suggestion.label)}
 								>
-									<span class="text-[10px] uppercase tracking-wider text-text-muted/60 w-12 shrink-0">{suggestion.category}</span>
-									<span class="text-xs text-text truncate">{suggestion.label}</span>
+									<span class="text-[11px] uppercase tracking-wider text-text-muted/60 w-12 shrink-0">{suggestion.category}</span>
+									<span class="text-[13px] text-text truncate">{suggestion.label}</span>
 								</button>
 							{/each}
 						</div>
@@ -516,9 +516,9 @@
 			</div>
 
 			<!-- Right panel: span detail -->
-			<div class="flex-1 min-h-0 overflow-y-auto table-float rounded-xl">
+			<div class="flex-1 min-h-0 min-w-[420px] overflow-y-auto table-float rounded-xl">
 				<div class="px-3 py-2 border-b border-border/55 bg-gradient-to-r from-bg-secondary/70 via-bg-secondary/45 to-transparent sticky top-0 z-10 backdrop-blur-md">
-					<p class="text-[10px] uppercase tracking-[0.16em] text-text-muted">Span inspection</p>
+					<p class="text-[11px] uppercase tracking-[0.14em] text-text-muted">Span inspection</p>
 				</div>
 				{#if selectedSpan}
 					<SpanDetail span={selectedSpan} {onSpanAction} allSpans={spans} />
