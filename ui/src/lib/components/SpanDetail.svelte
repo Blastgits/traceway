@@ -43,7 +43,22 @@
 			fileContent = await getFileContent(fileHash);
 			fileContentLoaded = true;
 		} catch {
-			fileContentError = 'Could not load file content';
+			const out = span?.output as Record<string, unknown> | null | undefined;
+			const fallback = out && typeof out === 'object'
+				? (typeof out.file_content === 'string'
+					? out.file_content
+					: typeof out.content === 'string'
+						? out.content
+						: typeof out.preview === 'string'
+							? out.preview
+							: '')
+				: '';
+			if (fallback) {
+				fileContent = fallback;
+				fileContentLoaded = true;
+			} else {
+				fileContentError = 'Could not load file content';
+			}
 		}
 		fileContentLoading = false;
 	}
@@ -521,12 +536,12 @@
 				class="px-3 py-1.5 text-xs rounded-lg transition-all duration-150
 					{activeTab === 'input' ? 'bg-accent/15 text-text font-medium border border-accent/35' : 'text-text-muted hover:text-text-secondary'}"
 				onclick={() => activeTab = 'input'}
-			>Input</button>
+			>Span Input</button>
 			<button
 				class="px-3 py-1.5 text-xs rounded-lg transition-all duration-150
 					{activeTab === 'output' ? 'bg-accent/15 text-text font-medium border border-accent/35' : 'text-text-muted hover:text-text-secondary'}"
 				onclick={() => activeTab = 'output'}
-			>Output</button>
+			>Span Output</button>
 			<button
 				class="px-3 py-1.5 text-xs rounded-lg transition-all duration-150
 					{activeTab === 'attributes' ? 'bg-accent/15 text-text font-medium border border-accent/35' : 'text-text-muted hover:text-text-secondary'}"

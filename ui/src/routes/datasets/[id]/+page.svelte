@@ -39,7 +39,6 @@
 	import StatusBadge from '$lib/components/StatusBadge.svelte';
 	import EvalScoreBadge from '$lib/components/EvalScoreBadge.svelte';
 	import EvalProgressBar from '$lib/components/EvalProgressBar.svelte';
-	import FloatingInspector from '$lib/components/FloatingInspector.svelte';
 	import { onMount } from 'svelte';
 
 	const datasetId = $derived(page.params.id ?? '');
@@ -96,7 +95,10 @@
 	// ── Queue state ────────────────────────────────────────────────────
 	let claimName = $state('reviewer');
 	let editingItem: QueueItem | null = $state(null);
+	let queueSelectedId: string | null = $state(null);
 	let editedJson = $state('');
+	const selectedQueueItem = $derived(queueItems.find((q) => q.id === queueSelectedId) ?? null);
+	const selectedQueueDatapoint = $derived(selectedQueueItem ? datapoints.find((d) => d.id === selectedQueueItem.datapoint_id) ?? null : null);
 
 	// ── Eval Run state ────────────────────────────────────────────────
 	let showNewEvalForm = $state(false);
@@ -114,6 +116,8 @@
 	let evalCompareMode = $state(false);
 	let evalCompareSelected: Set<string> = $state(new Set());
 	let evalDeleteConfirm: string | null = $state(null);
+	let evalSelectedRunId: string | null = $state(null);
+	const selectedEvalRun = $derived(evalRuns.find((r) => r.id === evalSelectedRunId) ?? null);
 
 	async function loadModelsForConnection(connId: string) {
 		if (!connId) { connectionModels = []; return; }
@@ -283,7 +287,6 @@
 	// ── Bulk select ────────────────────────────────────────────────────
 	let selected: Set<string> = $state(new Set());
 	let selectedDatapointId: string | null = $state(null);
-	let datapointInspectorWidth: 'compact' | 'default' | 'wide' = $state('default');
 	const selectedDatapoint = $derived(datapoints.find((d) => d.id === selectedDatapointId) ?? null);
 
 	function toggleSelect(id: string) {
@@ -431,6 +434,7 @@
 		try {
 			const updated = await claimQueueItem(itemId, claimName);
 			queueItems = queueItems.map((i) => (i.id === updated.id ? updated : i));
+			queueSelectedId = updated.id;
 			getQueue(datasetId).then((q) => (queueItems = q.items)).catch(() => {});
 		} catch {
 			// error
@@ -438,6 +442,7 @@
 	}
 
 	function startEditing(item: QueueItem) {
+		queueSelectedId = item.id;
 		editingItem = item;
 		editedJson = item.original_data ? JSON.stringify(item.original_data, null, 2) : '{}';
 	}
@@ -518,6 +523,35 @@
 
 	$effect(() => {
 		if (activeTab !== 'datapoints') selectedDatapointId = null;
+	});
+
+	$effect(() => {
+		if (queueSelectedId && !queueItems.some((q) => q.id === queueSelectedId)) {
+			queueSelectedId = null;
+		}
+	});
+
+	$effect(() => {
+		if (activeTab !== 'queue') {
+			queueSelectedId = null;
+			editingItem = null;
+		}
+	});
+
+	$effect(() => {
+		if (evalSelectedRunId && !evalRuns.some((r) => r.id === evalSelectedRunId)) {
+			evalSelectedRunId = null;
+		}
+	});
+
+	$effect(() => {
+		if (activeTab !== 'evals') evalSelectedRunId = null;
+	});
+
+	$effect(() => {
+		if (activeTab === 'evals' && !evalSelectedRunId && evalRuns.length > 0) {
+			evalSelectedRunId = evalRuns[0].id;
+		}
 	});
 
 	const queueItemsByStatus = $derived.by(() => {
@@ -642,155 +676,116 @@
 
 		<!-- Tab: Datapoints -->
 		{#if activeTab === 'datapoints'}
-			<div class="space-y-3">
-				<!-- Actions row -->
-				<div class="flex items-center gap-2">
-					<button
-						class="px-3 py-1.5 text-xs bg-amber-400/10 text-amber-400 border border-amber-400/20 rounded hover:bg-amber-400/20 transition-colors"
-						onclick={() => (showAddForm = !showAddForm)}
-					>
-						{showAddForm ? 'Cancel' : '+ Add Datapoint'}
-					</button>
-					{#if selected.size > 0}
-						<button
-							class="px-3 py-1.5 text-xs bg-accent/10 text-accent border border-accent/20 rounded hover:bg-accent/20 transition-colors"
-							onclick={handleEnqueueSelected}
-						>
-							Enqueue {selected.size} selected
-						</button>
-					{/if}
-					{#if datapoints.length > 0}
-						<button
-							class="px-3 py-1.5 text-xs bg-bg-tertiary text-text-secondary border border-border rounded hover:text-text transition-colors"
-							onclick={exportDatasetJson}
-						>Export JSON</button>
-					{/if}
-				</div>
-
-				<!-- Add form -->
-				{#if showAddForm}
-					<div class="bg-bg-secondary border border-border rounded p-4 space-y-3">
-						<div>
-							<label for="dp-kind" class="block text-xs text-text-muted uppercase mb-1">DatapointKind (JSON)</label>
-							<textarea
-								id="dp-kind"
-								bind:value={addKindJson}
-								rows={8}
-								class="w-full bg-bg-tertiary border border-border rounded px-3 py-2 text-xs text-text font-mono placeholder:text-text-muted"
-							></textarea>
-						</div>
-						{#if addError}
-							<div class="text-danger text-xs">{addError}</div>
+			<div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_420px] gap-0 items-start">
+				<div class="space-y-3 xl:pr-3">
+					<div class="flex items-center gap-2">
+						<button class="btn-secondary h-8" onclick={() => (showAddForm = !showAddForm)}>{showAddForm ? 'Cancel' : '+ Add Datapoint'}</button>
+						{#if selected.size > 0}
+							<button class="btn-primary h-8" onclick={handleEnqueueSelected}>Enqueue {selected.size} selected</button>
 						{/if}
-						<button
-							class="px-4 py-1.5 text-xs bg-amber-400 text-bg font-semibold rounded hover:bg-amber-300 transition-colors disabled:opacity-50"
-							disabled={adding}
-							onclick={handleAddDatapoint}
-						>
-							{adding ? 'Adding...' : 'Add'}
-						</button>
+						{#if datapoints.length > 0}
+							<button class="btn-ghost h-8" onclick={exportDatasetJson}>Export JSON</button>
+						{/if}
 					</div>
-				{/if}
 
-				<!-- Table header -->
-				<div class="grid grid-cols-[32px_80px_1fr_90px_120px_80px] gap-3 px-3 text-xs text-text-muted uppercase items-center">
-					<label class="flex items-center justify-center">
-						<input
-							type="checkbox"
-							checked={selected.size === datapoints.length && datapoints.length > 0}
-							onchange={toggleSelectAll}
-							class="accent-amber-400"
-						/>
-					</label>
-					<span>Kind</span>
-					<span>Preview</span>
-					<span>Source</span>
-					<span>Created</span>
-					<span class="text-right">Actions</span>
+					{#if showAddForm}
+						<div class="table-float p-4 space-y-3">
+							<div>
+								<label for="dp-kind" class="label-micro block uppercase mb-1">DatapointKind (JSON)</label>
+								<textarea id="dp-kind" bind:value={addKindJson} rows={8} class="control-textarea text-xs font-mono"></textarea>
+							</div>
+							{#if addError}
+								<div class="alert-danger">{addError}</div>
+							{/if}
+							<button class="btn-primary" disabled={adding} onclick={handleAddDatapoint}>{adding ? 'Adding...' : 'Add'}</button>
+						</div>
+					{/if}
+
+					<div class="table-float overflow-hidden">
+						<div class="grid grid-cols-[32px_84px_1fr_90px_120px_80px] gap-3 px-3 py-2 table-head-compact items-center border-b border-border/55">
+							<label class="flex items-center justify-center">
+								<input type="checkbox" checked={selected.size === datapoints.length && datapoints.length > 0} onchange={toggleSelectAll} class="accent-amber-400" />
+							</label>
+							<span>Kind</span>
+							<span>Preview</span>
+							<span>Source</span>
+							<span>Created</span>
+							<span class="text-right">Actions</span>
+						</div>
+
+						{#if datapoints.length === 0}
+							<div class="text-text-muted text-sm text-center py-10">No datapoints yet</div>
+						{:else}
+							<div class="space-y-0">
+								{#each datapoints as dp (dp.id)}
+									<div
+										class="grid grid-cols-[32px_84px_1fr_90px_120px_80px] gap-3 items-center px-3 py-2 text-sm border-b border-border/45 hover:bg-bg-secondary/45 motion-row cursor-pointer {selectedDatapointId === dp.id ? 'bg-bg-secondary/72' : ''}"
+										onclick={() => (selectedDatapointId = dp.id)}
+										onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && (selectedDatapointId = dp.id)}
+										role="button"
+										tabindex="0"
+									>
+										<label class="flex items-center justify-center">
+											<input type="checkbox" checked={selected.has(dp.id)} onclick={(e) => e.stopPropagation()} onchange={() => toggleSelect(dp.id)} class="accent-amber-400" />
+										</label>
+										<span class="text-xs px-1.5 py-0.5 rounded border {dp.kind.type === 'llm_conversation' ? 'bg-purple-400/10 text-purple-400 border-purple-400/20' : 'bg-text-muted/10 text-text-secondary border-text-muted/20'}">
+											{dp.kind.type === 'llm_conversation' ? 'LLM' : 'Generic'}
+										</span>
+										<span class="text-text-secondary text-xs truncate font-mono">{datapointPreview(dp).slice(0, 110)}</span>
+										<span class="text-text-muted text-xs">{dp.source}</span>
+										<span class="text-text-muted text-xs">{formatDate(dp.created_at)}</span>
+										<div class="text-right flex items-center justify-end gap-2">
+											<button class="text-text-muted hover:text-danger text-xs transition-colors" onclick={(e) => { e.stopPropagation(); handleDeleteDatapoint(dp.id); }}>delete</button>
+										</div>
+									</div>
+								{/each}
+							</div>
+						{/if}
+					</div>
 				</div>
 
-				{#if datapoints.length === 0}
-					<div class="text-text-muted text-sm text-center py-8">No datapoints yet</div>
-				{:else}
-					<div class="space-y-0">
-						{#each datapoints as dp (dp.id)}
-							<div
-								class="grid grid-cols-[32px_80px_1fr_90px_120px_80px] gap-3 items-center px-3 py-2 text-sm border-b border-border/50 hover:bg-bg-secondary transition-colors cursor-pointer {selectedDatapointId === dp.id ? 'bg-bg-secondary/70' : ''}"
-								onclick={() => (selectedDatapointId = dp.id)}
-								onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && (selectedDatapointId = dp.id)}
-								role="button"
-								tabindex="0"
-							>
-								<label class="flex items-center justify-center">
-									<input
-										type="checkbox"
-										checked={selected.has(dp.id)}
-										onclick={(e) => e.stopPropagation()}
-										onchange={() => toggleSelect(dp.id)}
-										class="accent-amber-400"
-									/>
-								</label>
-								<span class="text-xs px-1.5 py-0.5 rounded border
-									{dp.kind.type === 'llm_conversation'
-										? 'bg-purple-400/10 text-purple-400 border-purple-400/20'
-										: 'bg-text-muted/10 text-text-secondary border-text-muted/20'}">
-									{dp.kind.type === 'llm_conversation' ? 'LLM' : 'Generic'}
-								</span>
-								<span class="text-text-secondary text-xs truncate font-mono">{datapointPreview(dp).slice(0, 80)}</span>
-								<span class="text-text-muted text-xs">{dp.source}</span>
-								<span class="text-text-muted text-xs">{formatDate(dp.created_at)}</span>
-								<div class="text-right flex items-center justify-end gap-2">
-									<button
-										class="text-text-muted hover:text-danger text-xs transition-colors"
-										onclick={(e) => {
-											e.stopPropagation();
-											handleDeleteDatapoint(dp.id);
-										}}
-									>delete</button>
-								</div>
-							</div>
-						{/each}
-					</div>
-				{/if}
-
-				<FloatingInspector
-					open={!!selectedDatapoint}
-					title={selectedDatapoint ? selectedDatapoint.kind.type === 'llm_conversation' ? 'Conversation datapoint' : 'Datapoint' : 'Datapoint'}
-					subtitle={selectedDatapoint ? `${shortId(selectedDatapoint.id)} - ${formatDate(selectedDatapoint.created_at)}` : ''}
-					width={datapointInspectorWidth}
-					on:close={() => (selectedDatapointId = null)}
-					on:width={(e) => (datapointInspectorWidth = e.detail.width)}
-				>
+				<div class="min-h-[420px] border border-border/55 xl:rounded-l-none rounded-xl bg-bg-secondary/24 p-3.5 motion-fade-in">
 					{#if selectedDatapoint}
 						<div class="space-y-3">
+							<div class="flex items-center justify-between">
+								<div>
+									<div class="text-[14px] font-semibold text-text">Row {shortId(selectedDatapoint.id)}</div>
+									<div class="text-[11px] text-text-muted">{formatDate(selectedDatapoint.created_at)}</div>
+								</div>
+								<button class="btn-ghost h-7 text-[12px]" onclick={() => (selectedDatapointId = null)}>Close</button>
+							</div>
+
 							<div class="grid grid-cols-2 gap-2 text-[12px]">
-								<div class="rounded-lg border border-border/60 bg-bg-secondary/35 px-2.5 py-2">
+								<div class="surface-quiet px-2.5 py-2">
 									<div class="text-text-muted">Source</div>
 									<div class="text-text mt-0.5">{selectedDatapoint.source}</div>
 								</div>
-								<div class="rounded-lg border border-border/60 bg-bg-secondary/35 px-2.5 py-2">
+								<div class="surface-quiet px-2.5 py-2">
 									<div class="text-text-muted">Kind</div>
 									<div class="text-text mt-0.5">{selectedDatapoint.kind.type}</div>
 								</div>
 							</div>
 
 							<div class="space-y-1.5">
-								<div class="text-[11px] uppercase tracking-[0.12em] text-text-muted">Data</div>
+								<div class="label-micro uppercase">Data</div>
 								<pre class="query-float rounded-lg border border-border/60 p-2.5 text-[12px] text-text-secondary whitespace-pre-wrap">{formatJson(datapointData(selectedDatapoint))}</pre>
 							</div>
-
 							<div class="space-y-1.5">
-								<div class="text-[11px] uppercase tracking-[0.12em] text-text-muted">Target</div>
+								<div class="label-micro uppercase">Target</div>
 								<pre class="query-float rounded-lg border border-border/60 p-2.5 text-[12px] text-text-secondary whitespace-pre-wrap">{formatJson(datapointTarget(selectedDatapoint))}</pre>
 							</div>
-
 							<div class="space-y-1.5">
-								<div class="text-[11px] uppercase tracking-[0.12em] text-text-muted">Metadata</div>
+								<div class="label-micro uppercase">Metadata</div>
 								<pre class="query-float rounded-lg border border-border/60 p-2.5 text-[12px] text-text-secondary whitespace-pre-wrap">{formatJson(datapointMetadata(selectedDatapoint))}</pre>
 							</div>
 						</div>
+					{:else}
+						<div class="h-full flex flex-col justify-center items-center text-center px-3">
+							<div class="text-[14px] font-semibold text-text">Datapoint preview</div>
+							<p class="text-[12px] text-text-muted mt-1">Select a row on the left to inspect data, target, and metadata here.</p>
+						</div>
 					{/if}
-				</FloatingInspector>
+				</div>
 			</div>
 
 		<!-- Tab: Import -->
@@ -852,131 +847,119 @@
 
 		<!-- Tab: Annotation Queue -->
 		{:else if activeTab === 'queue'}
-			<div class="space-y-4">
-				<!-- Counts -->
-				<div class="flex items-center gap-3 text-sm">
-				<span class="px-2 py-0.5 rounded text-xs border bg-warning/20 text-warning border-warning/30">
-					{queueItemsByStatus.pending.length} pending
-				</span>
-				<span class="px-2 py-0.5 rounded text-xs border bg-accent/20 text-accent border-accent/30">
-					{queueItemsByStatus.claimed.length} claimed
-				</span>
-				<span class="px-2 py-0.5 rounded text-xs border bg-success/20 text-success border-success/30">
-					{queueItemsByStatus.completed.length} completed
-				</span>
-					<div class="flex-1"></div>
-					<label for="claim-name" class="text-xs text-text-muted">Claim as:</label>
-					<input
-						id="claim-name"
-						type="text"
-						bind:value={claimName}
-						class="bg-bg-tertiary border border-border rounded px-2 py-1 text-xs text-text w-28"
-					/>
+			<div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_420px] gap-3 items-start">
+				<div class="space-y-3">
+					<div class="flex items-center gap-3 text-sm">
+						<span class="px-2 py-0.5 rounded text-xs border bg-warning/20 text-warning border-warning/30">{queueItemsByStatus.pending.length} pending</span>
+						<span class="px-2 py-0.5 rounded text-xs border bg-accent/20 text-accent border-accent/30">{queueItemsByStatus.claimed.length} claimed</span>
+						<span class="px-2 py-0.5 rounded text-xs border bg-success/20 text-success border-success/30">{queueItemsByStatus.completed.length} completed</span>
+						<div class="flex-1"></div>
+						<label for="claim-name" class="label-micro">Claim as:</label>
+						<input id="claim-name" type="text" bind:value={claimName} class="control-input w-32" />
+					</div>
+
+					{#if queueItems.length === 0}
+						<div class="text-text-muted text-sm text-center py-8">Queue is empty. Select datapoints and click "Enqueue" to start annotation.</div>
+					{:else}
+						<div class="table-float overflow-hidden">
+							<div class="grid grid-cols-[96px_120px_120px_120px_86px] gap-3 px-3 py-2 table-head-compact border-b border-border/55">
+								<span>Status</span>
+								<span>Datapoint</span>
+								<span>Owner</span>
+								<span>Created</span>
+								<span class="text-right">Action</span>
+							</div>
+							{#each queueItems as item (item.id)}
+								<div
+									class="grid grid-cols-[96px_120px_120px_120px_86px] gap-3 items-center px-3 py-2 border-b border-border/45 hover:bg-bg-secondary/45 motion-row cursor-pointer {queueSelectedId === item.id ? 'bg-bg-secondary/72' : ''}"
+									role="button"
+									tabindex="0"
+									onclick={() => (queueSelectedId = item.id)}
+									onkeydown={(e) => {
+										if (e.key === 'Enter' || e.key === ' ') {
+											e.preventDefault();
+											queueSelectedId = item.id;
+										}
+									}}
+								>
+									<div>
+										{#if item.status === 'pending'}
+											<span class="px-2 py-0.5 rounded text-xs border bg-warning/20 text-warning border-warning/30">pending</span>
+										{:else if item.status === 'claimed'}
+											<span class="px-2 py-0.5 rounded text-xs border bg-accent/20 text-accent border-accent/30">claimed</span>
+										{:else}
+											<span class="px-2 py-0.5 rounded text-xs border bg-success/20 text-success border-success/30">completed</span>
+										{/if}
+									</div>
+									<div class="text-text-secondary text-xs font-mono truncate">{shortId(item.datapoint_id)}</div>
+									<div class="text-text-muted text-xs truncate">{item.claimed_by ?? '-'}</div>
+									<div class="text-text-muted text-xs">{formatDate(item.created_at)}</div>
+									<div class="text-right">
+										{#if item.status === 'pending'}
+											<button class="btn-ghost h-7 text-[12px]" onclick={(e) => { e.stopPropagation(); handleClaim(item.id); }}>Claim</button>
+										{:else if item.status === 'claimed'}
+											<button class="btn-ghost h-7 text-[12px]" onclick={(e) => { e.stopPropagation(); startEditing(item); }}>Edit</button>
+										{:else}
+											<span class="text-text-muted text-xs">-</span>
+										{/if}
+									</div>
+								</div>
+							{/each}
+						</div>
+					{/if}
 				</div>
 
-				<!-- Editing overlay -->
-				{#if editingItem}
-					<div class="bg-bg-secondary border border-accent/30 rounded p-4 space-y-3">
-						<div class="flex items-center justify-between">
-							<span class="text-sm font-semibold text-text">Editing: {shortId(editingItem.id)}</span>
-							<button class="text-text-muted hover:text-text text-xs" onclick={() => (editingItem = null)}>cancel</button>
+				<div class="surface-panel sticky top-24 p-3.5 min-h-[420px] motion-slide-in-right">
+					{#if selectedQueueItem}
+						<div class="space-y-3">
+							<div class="flex items-center justify-between">
+								<div>
+									<div class="text-[14px] font-semibold text-text">Queue {shortId(selectedQueueItem.id)}</div>
+									<div class="text-[11px] text-text-muted">{selectedQueueItem.status} - {formatDate(selectedQueueItem.created_at)}</div>
+								</div>
+								<button class="btn-ghost h-7 text-[12px]" onclick={() => { queueSelectedId = null; editingItem = null; }}>Close</button>
+							</div>
+
+							<div class="grid grid-cols-2 gap-2 text-[12px]">
+								<div class="surface-quiet px-2.5 py-2"><div class="text-text-muted">Datapoint</div><div class="text-text mt-0.5 font-mono">{shortId(selectedQueueItem.datapoint_id)}</div></div>
+								<div class="surface-quiet px-2.5 py-2"><div class="text-text-muted">Reviewer</div><div class="text-text mt-0.5">{selectedQueueItem.claimed_by ?? '-'}</div></div>
+							</div>
+
+							<div class="space-y-1.5">
+								<div class="label-micro uppercase">Original</div>
+								<pre class="query-float rounded-lg border border-border/60 p-2.5 text-[12px] text-text-secondary whitespace-pre-wrap">{formatJson(selectedQueueItem.original_data)}</pre>
+							</div>
+
+							{#if selectedQueueItem.status === 'claimed'}
+								<div class="space-y-1.5">
+									<div class="label-micro uppercase">Edited</div>
+									<textarea bind:value={editedJson} rows={8} class="control-textarea text-xs font-mono"></textarea>
+									<div class="flex items-center gap-2">
+										<button class="btn-primary" onclick={handleSubmit}>Submit</button>
+										<button class="btn-secondary" onclick={() => { editingItem = null; editedJson = ''; }}>Reset</button>
+									</div>
+								</div>
+							{:else if selectedQueueItem.edited_data}
+								<div class="space-y-1.5">
+									<div class="label-micro uppercase">Edited Result</div>
+									<pre class="query-float rounded-lg border border-border/60 p-2.5 text-[12px] text-text whitespace-pre-wrap">{formatJson(selectedQueueItem.edited_data)}</pre>
+								</div>
+							{/if}
+
+							{#if selectedQueueDatapoint}
+								<div class="space-y-1.5">
+									<div class="label-micro uppercase">Datapoint Snapshot</div>
+									<pre class="query-float rounded-lg border border-border/60 p-2.5 text-[12px] text-text-secondary whitespace-pre-wrap">{formatJson(selectedQueueDatapoint.kind)}</pre>
+								</div>
+							{/if}
 						</div>
-						<div class="grid grid-cols-2 gap-4">
-							<div>
-								<div class="text-xs text-text-muted uppercase mb-1">Original</div>
-								<pre class="text-xs bg-bg-tertiary rounded p-3 overflow-auto max-h-48 font-mono text-text-secondary whitespace-pre-wrap">{formatJson(editingItem.original_data)}</pre>
-							</div>
-							<div>
-								<div class="text-xs text-text-muted uppercase mb-1">Edited</div>
-								<textarea
-									bind:value={editedJson}
-									rows={8}
-									class="w-full bg-bg-tertiary border border-border rounded px-3 py-2 text-xs text-text font-mono"
-								></textarea>
-							</div>
+					{:else}
+						<div class="h-full flex flex-col justify-center items-center text-center px-3">
+							<div class="text-[14px] font-semibold text-text">Queue item preview</div>
+							<p class="text-[12px] text-text-muted mt-1">Select a queue row to inspect or edit it here.</p>
 						</div>
-						<button
-							class="px-4 py-1.5 text-xs bg-success text-bg font-semibold rounded hover:bg-success/80 transition-colors"
-							onclick={handleSubmit}
-						>Submit</button>
-					</div>
-				{/if}
-
-				<!-- Pending -->
-				{#if queueItemsByStatus.pending.length > 0}
-					<div class="space-y-1">
-						<div class="text-xs text-text-muted uppercase">Pending ({queueItemsByStatus.pending.length})</div>
-						{#each queueItemsByStatus.pending as item (item.id)}
-							<div class="flex items-center gap-3 px-3 py-2 bg-bg-secondary border border-border/50 rounded text-sm">
-								<StatusBadge status="running" />
-								<span class="text-text-secondary text-xs font-mono flex-1 truncate">{shortId(item.datapoint_id)}</span>
-								<span class="text-text-muted text-xs">{formatDate(item.created_at)}</span>
-								<button
-									class="px-2 py-1 text-xs bg-accent/10 text-accent border border-accent/20 rounded hover:bg-accent/20 transition-colors"
-									onclick={() => handleClaim(item.id)}
-								>Claim</button>
-							</div>
-						{/each}
-					</div>
-				{/if}
-
-				<!-- Claimed -->
-				{#if queueItemsByStatus.claimed.length > 0}
-					<div class="space-y-1">
-						<div class="text-xs text-text-muted uppercase">Claimed ({queueItemsByStatus.claimed.length})</div>
-						{#each queueItemsByStatus.claimed as item (item.id)}
-							<div class="flex items-center gap-3 px-3 py-2 bg-bg-secondary border border-border/50 rounded text-sm">
-								<span class="px-2 py-0.5 rounded text-xs border bg-accent/20 text-accent border-accent/30">claimed</span>
-								<span class="text-text-secondary text-xs font-mono flex-1 truncate">{shortId(item.datapoint_id)}</span>
-								{#if item.claimed_by}
-									<span class="text-text-muted text-xs">by {item.claimed_by}</span>
-								{/if}
-								<button
-									class="px-2 py-1 text-xs bg-amber-400/10 text-amber-400 border border-amber-400/20 rounded hover:bg-amber-400/20 transition-colors"
-									onclick={() => startEditing(item)}
-								>Edit & Submit</button>
-							</div>
-						{/each}
-					</div>
-				{/if}
-
-				<!-- Completed -->
-				{#if queueItemsByStatus.completed.length > 0}
-					<div class="space-y-1">
-						<div class="text-xs text-text-muted uppercase">Completed ({queueItemsByStatus.completed.length})</div>
-						{#each queueItemsByStatus.completed as item (item.id)}
-							<div class="flex items-center gap-3 px-3 py-2 bg-bg-secondary border border-border/50 rounded text-sm">
-								<StatusBadge status="completed" />
-								<span class="text-text-secondary text-xs font-mono truncate">{shortId(item.datapoint_id)}</span>
-								{#if item.claimed_by}
-									<span class="text-text-muted text-xs">by {item.claimed_by}</span>
-								{/if}
-								<div class="flex-1"></div>
-								{#if item.edited_data}
-									<details class="text-xs">
-										<summary class="text-accent cursor-pointer">view edits</summary>
-										<div class="grid grid-cols-2 gap-2 mt-2">
-											<div>
-												<div class="text-text-muted uppercase mb-0.5">Original</div>
-												<pre class="bg-bg-tertiary rounded p-2 overflow-auto max-h-32 font-mono text-text-secondary whitespace-pre-wrap">{formatJson(item.original_data)}</pre>
-											</div>
-											<div>
-												<div class="text-text-muted uppercase mb-0.5">Edited</div>
-												<pre class="bg-bg-tertiary rounded p-2 overflow-auto max-h-32 font-mono text-text whitespace-pre-wrap">{formatJson(item.edited_data)}</pre>
-											</div>
-										</div>
-									</details>
-								{/if}
-							</div>
-						{/each}
-					</div>
-				{/if}
-
-				{#if queueItems.length === 0}
-					<div class="text-text-muted text-sm text-center py-8">
-						Queue is empty. Select datapoints and click "Enqueue" to start annotation.
-					</div>
-				{/if}
+					{/if}
+				</div>
 			</div>
 
 		<!-- Tab: Evals -->
@@ -1137,84 +1120,108 @@
 
 					<!-- Eval runs table -->
 					{#if evalRuns.length > 0}
-						<div class="grid grid-cols-[1fr_120px_80px_80px_80px_100px_60px] gap-3 px-3 text-xs text-text-muted uppercase items-center">
-							{#if evalCompareMode}<span></span>{/if}
-							<span>Name</span>
-							<span>Status</span>
-							<span>Score</span>
-							<span>Pass Rate</span>
-							<span>Datapoints</span>
-							<span>Date</span>
-							<span class="text-right">Actions</span>
-						</div>
-						<div class="space-y-0">
-						{#each evalRuns as run (run.id)}
-							<div
-								class="grid grid-cols-[1fr_120px_80px_80px_80px_100px_60px] gap-3 items-center px-3 py-2 text-sm border-b border-border/50 hover:bg-bg-secondary transition-colors cursor-pointer"
-								role="button"
-								tabindex={evalCompareMode ? -1 : 0}
-								aria-label={`Open eval run ${run.name ?? run.id}`}
-								onclick={() => {
-									if (!evalCompareMode) goto(`/datasets/${datasetId}/eval/${run.id}`);
-								}}
-								onkeydown={(e) => {
-									if (evalCompareMode) return;
-									if (e.key === 'Enter' || e.key === ' ') {
-										e.preventDefault();
-										goto(`/datasets/${datasetId}/eval/${run.id}`);
-									}
-								}}
-							>
-								<div class="flex items-center gap-2 min-w-0">
-									{#if evalCompareMode}
-										<button
-											type="button"
-											class="inline-flex"
-											aria-label={`Toggle compare selection for ${run.name ?? run.id}`}
-											onclick={(e) => { e.stopPropagation(); toggleCompareSelect(run.id); }}
-										>
-												<input type="checkbox" checked={evalCompareSelected.has(run.id)} class="accent-purple-400" />
-										</button>
-									{/if}
-										<span class="truncate text-text">{run.name ?? run.config.model}</span>
-										<span class="shrink-0 px-1.5 py-0.5 text-xs bg-purple-400/10 text-purple-400 rounded">{run.config.model}</span>
-									</div>
-									<div>
-										{#if run.status === 'running'}
-											<EvalProgressBar completed={run.results.completed} total={run.results.total} />
-										{:else}
-											<StatusBadge status={run.status === 'completed' ? 'completed' : run.status === 'failed' || run.status === 'cancelled' ? 'failed' : 'running'} />
-										{/if}
-									</div>
-									<div>
-										<EvalScoreBadge score={run.results.scores.mean} size="xs" />
-									</div>
-									<div class="text-xs font-mono text-text-secondary">
-										{run.results.scores.pass_rate != null ? `${Math.round(run.results.scores.pass_rate * 100)}%` : '\u2014'}
-									</div>
-									<div class="text-xs font-mono text-text-secondary">
-										{run.results.completed}/{run.results.total}
-									</div>
-									<div class="text-xs text-text-muted">{relativeTime(run.created_at)}</div>
-									<div class="text-right">
-										<!-- svelte-ignore a11y_click_events_have_key_events -->
-										<!-- svelte-ignore a11y_no_static_element_interactions -->
-										<span onclick={(e) => e.stopPropagation()}>
-											{#if run.status === 'running'}
-												<button
-													class="text-text-muted hover:text-warning text-xs transition-colors"
-													onclick={() => handleCancelEvalRun(run.id)}
-												>cancel</button>
-											{:else}
-												<button
-													class="text-text-muted hover:text-danger text-xs transition-colors"
-													onclick={() => handleDeleteEvalRun(run.id)}
-												>{evalDeleteConfirm === run.id ? 'confirm?' : 'delete'}</button>
-											{/if}
-										</span>
-									</div>
+						<div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_420px] gap-3 items-start">
+							<div class="table-float overflow-hidden">
+								<div class="grid grid-cols-[1fr_120px_80px_80px_80px_100px_72px] gap-3 px-3 py-2 table-head-compact border-b border-border/55">
+									{#if evalCompareMode}<span></span>{/if}
+									<span>Name</span>
+									<span>Status</span>
+									<span>Score</span>
+									<span>Pass Rate</span>
+									<span>Datapoints</span>
+									<span>Date</span>
+									<span class="text-right">Actions</span>
 								</div>
-							{/each}
+								{#each evalRuns as run (run.id)}
+									<div
+										class="grid grid-cols-[1fr_120px_80px_80px_80px_100px_72px] gap-3 items-center px-3 py-2 text-sm border-b border-border/45 hover:bg-bg-secondary/45 motion-row cursor-pointer {evalSelectedRunId === run.id ? 'bg-bg-secondary/72' : ''}"
+										role="button"
+										tabindex={evalCompareMode ? -1 : 0}
+										aria-label={`Select eval run ${run.name ?? run.id}`}
+										onclick={() => {
+											if (!evalCompareMode) evalSelectedRunId = run.id;
+										}}
+										onkeydown={(e) => {
+											if (evalCompareMode) return;
+											if (e.key === 'Enter' || e.key === ' ') {
+												e.preventDefault();
+												evalSelectedRunId = run.id;
+											}
+										}}
+									>
+										<div class="flex items-center gap-2 min-w-0">
+											{#if evalCompareMode}
+												<button
+													type="button"
+													class="inline-flex"
+													aria-label={`Toggle compare selection for ${run.name ?? run.id}`}
+													onclick={(e) => { e.stopPropagation(); toggleCompareSelect(run.id); }}
+												>
+													<input type="checkbox" checked={evalCompareSelected.has(run.id)} class="accent-purple-400" />
+												</button>
+											{/if}
+											<span class="truncate text-text">{run.name ?? run.config.model}</span>
+											<span class="shrink-0 px-1.5 py-0.5 text-xs bg-purple-400/10 text-purple-400 rounded">{run.config.model}</span>
+										</div>
+										<div>
+											{#if run.status === 'running'}
+												<EvalProgressBar completed={run.results.completed} total={run.results.total} />
+											{:else}
+												<StatusBadge status={run.status === 'completed' ? 'completed' : run.status === 'failed' || run.status === 'cancelled' ? 'failed' : 'running'} />
+											{/if}
+										</div>
+										<div><EvalScoreBadge score={run.results.scores.mean} size="xs" /></div>
+										<div class="text-xs font-mono text-text-secondary">{run.results.scores.pass_rate != null ? `${Math.round(run.results.scores.pass_rate * 100)}%` : '\u2014'}</div>
+										<div class="text-xs font-mono text-text-secondary">{run.results.completed}/{run.results.total}</div>
+										<div class="text-xs text-text-muted">{relativeTime(run.created_at)}</div>
+										<div class="text-right">
+											{#if run.status === 'running'}
+												<button class="text-text-muted hover:text-warning text-xs transition-colors" onclick={(e) => { e.stopPropagation(); handleCancelEvalRun(run.id); }}>cancel</button>
+											{:else}
+												<button class="text-text-muted hover:text-danger text-xs transition-colors" onclick={(e) => { e.stopPropagation(); handleDeleteEvalRun(run.id); }}>{evalDeleteConfirm === run.id ? 'confirm?' : 'delete'}</button>
+											{/if}
+										</div>
+									</div>
+								{/each}
+							</div>
+
+							<div class="surface-panel sticky top-24 p-3.5 min-h-[420px] motion-slide-in-right">
+								{#if selectedEvalRun}
+									<div class="space-y-3">
+										<div class="flex items-center justify-between">
+											<div>
+												<div class="text-[14px] font-semibold text-text">{selectedEvalRun.name ?? selectedEvalRun.config.model}</div>
+												<div class="text-[11px] text-text-muted">{selectedEvalRun.config.model} - {relativeTime(selectedEvalRun.created_at)}</div>
+											</div>
+											<button class="btn-ghost h-7 text-[12px]" onclick={() => (evalSelectedRunId = null)}>Close</button>
+										</div>
+
+										<div class="grid grid-cols-2 gap-2 text-[12px]">
+											<div class="surface-quiet px-2.5 py-2"><div class="text-text-muted">Status</div><div class="text-text mt-0.5 capitalize">{selectedEvalRun.status}</div></div>
+											<div class="surface-quiet px-2.5 py-2"><div class="text-text-muted">Score</div><div class="text-text mt-0.5 font-mono">{selectedEvalRun.results.scores.mean != null ? selectedEvalRun.results.scores.mean.toFixed(3) : '\u2014'}</div></div>
+											<div class="surface-quiet px-2.5 py-2"><div class="text-text-muted">Pass Rate</div><div class="text-text mt-0.5 font-mono">{selectedEvalRun.results.scores.pass_rate != null ? `${Math.round(selectedEvalRun.results.scores.pass_rate * 100)}%` : '\u2014'}</div></div>
+											<div class="surface-quiet px-2.5 py-2"><div class="text-text-muted">Completed</div><div class="text-text mt-0.5 font-mono">{selectedEvalRun.results.completed}/{selectedEvalRun.results.total}</div></div>
+										</div>
+
+										<div class="space-y-1.5">
+											<div class="label-micro uppercase">Config</div>
+											<pre class="query-float rounded-lg border border-border/60 p-2.5 text-[12px] text-text-secondary whitespace-pre-wrap">{formatJson(selectedEvalRun.config)}</pre>
+										</div>
+
+										<div class="space-y-1.5">
+											<div class="label-micro uppercase">Score Breakdown</div>
+											<pre class="query-float rounded-lg border border-border/60 p-2.5 text-[12px] text-text-secondary whitespace-pre-wrap">{formatJson(selectedEvalRun.results.scores)}</pre>
+										</div>
+
+										<button class="btn-primary" onclick={() => goto(`/datasets/${datasetId}/eval/${selectedEvalRun.id}`)}>Open full run</button>
+									</div>
+								{:else}
+									<div class="h-full flex flex-col justify-center items-center text-center px-3">
+										<div class="text-[14px] font-semibold text-text">Eval preview</div>
+										<p class="text-[12px] text-text-muted mt-1">Select an eval run to inspect config and quick metrics.</p>
+									</div>
+								{/if}
+							</div>
 						</div>
 					{/if}
 				{/if}

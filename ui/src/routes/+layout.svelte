@@ -33,13 +33,30 @@
 	// Cmd+K search modal
 	let searchOpen = $state(false);
 	let globalQueryText = $state('');
+	let globalQueryInputEl: HTMLInputElement | null = $state(null);
 	let showCommandHelp = $state(false);
 	type ThemeMode = 'dark' | 'light' | 'system';
 	let theme: ThemeMode = $state('system');
 
 	const THEME_KEY = 'traceway:theme';
 
+	function isTypingTarget(target: EventTarget | null): boolean {
+		const el = target as HTMLElement | null;
+		if (!el) return false;
+		const tag = el.tagName;
+		if (el.isContentEditable) return true;
+		if (el.closest('[contenteditable="true"]')) return true;
+		return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+	}
+
 	function handleGlobalKeydown(e: KeyboardEvent) {
+		if (!e.metaKey && !e.ctrlKey && !e.altKey && e.key === '/' && globalQueryInputEl && !isTypingTarget(e.target)) {
+			e.preventDefault();
+			globalQueryInputEl?.focus();
+			globalQueryInputEl?.select();
+			return;
+		}
+
 		if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
 			e.preventDefault();
 			searchOpen = !searchOpen;
@@ -88,6 +105,7 @@
 		if (href === '/traces') return page.url.pathname === '/traces' || page.url.pathname.startsWith('/traces/');
 		if (href === '/settings') return page.url.pathname === '/settings' || page.url.pathname.startsWith('/settings/');
 		if (href === '/datasets') return page.url.pathname === '/datasets' || page.url.pathname.startsWith('/datasets/');
+		if (href === '/approvals') return page.url.pathname === '/approvals';
 		if (href === '/analytics') return page.url.pathname === '/analytics' || page.url.pathname.startsWith('/analytics/');
 		if (href === '/query') return page.url.pathname === '/query';
 		return page.url.pathname === href;
@@ -97,6 +115,7 @@
 		{ href: '/', label: 'Home' },
 		{ href: '/traces', label: 'Traces' },
 		{ href: '/review', label: 'Review' },
+		{ href: '/approvals', label: 'Approvals' },
 		{ href: '/analytics', label: 'Analytics' },
 		{ href: '/query', label: 'Search' },
 		{ href: '/datasets', label: 'Datasets' },
@@ -392,7 +411,7 @@
 						</div>
 					</div>
 				</div>
-				<div class="app-page-shell rounded-2xl p-4 lg:p-5">
+				<div class="app-page-shell app-shell-wide rounded-2xl p-4 lg:p-5">
 					{@render children()}
 				</div>
 			</div>
@@ -405,6 +424,7 @@
 						<button class="query-chip {isSectionActive('/query') ? 'query-chip-active' : ''}" onclick={() => goto('/query')}>Query</button>
 						<button class="query-chip {isSectionActive('/traces') ? 'query-chip-active' : ''}" onclick={() => goto('/traces')}>Traces</button>
 						<button class="query-chip hidden sm:inline-flex {isSectionActive('/review') ? 'query-chip-active' : ''}" onclick={() => goto('/review')}>Review</button>
+						<button class="query-chip hidden sm:inline-flex {isSectionActive('/approvals') ? 'query-chip-active' : ''}" onclick={() => goto('/approvals')}>Approvals</button>
 						<button class="query-chip hidden sm:inline-flex {isSectionActive('/analytics') ? 'query-chip-active' : ''}" onclick={() => goto('/analytics')}>Analytics</button>
 						<button class="query-chip hidden sm:inline-flex {isSectionActive('/datasets') ? 'query-chip-active' : ''}" onclick={() => goto('/datasets')}>Datasets</button>
 						<button class="query-chip hidden md:inline-flex" onclick={openNewProjectModal}>New project</button>
@@ -420,16 +440,18 @@
 							<input
 								type="text"
 								bind:value={globalQueryText}
+								bind:this={globalQueryInputEl}
+								maxlength={320}
 								onkeydown={(e) => e.key === 'Enter' && runGlobalQuery()}
 								placeholder={commandPlaceholder}
-								class="w-full bg-transparent py-1.5 text-[13px] text-text placeholder:text-text-muted/45 focus:outline-none"
+								class="w-full min-w-0 overflow-hidden text-ellipsis whitespace-nowrap bg-transparent py-1.5 text-[13px] text-text placeholder:text-text-muted/45 focus:outline-none"
 							/>
 						</div>
 
 						<button onclick={runGlobalQuery} class="px-3.5 py-1.5 bg-accent text-bg rounded-lg text-xs font-semibold tracking-wide hover:bg-accent/90 transition-colors">
 							{commandActionLabel}
 						</button>
-						<div class="hidden lg:block text-[10px] text-text-muted/80 pl-0.5"><span class="query-kbd">Cmd</span> + <span class="query-kbd">K</span></div>
+						<div class="hidden lg:block text-[10px] text-text-muted/80 pl-0.5"><span class="query-kbd">/</span></div>
 					</div>
 				</div>
 			</div>

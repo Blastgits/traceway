@@ -1,14 +1,16 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { getTraces, getSpans, subscribeEvents, getAuthConfig, createApiKey, type Span, type Trace, type AuthConfig, type ApiKeyCreated } from '$lib/api';
+	import { getTraces, getSpans, subscribeEvents, getAuthConfig, createApiKey, shortId, type Span, type Trace, type AuthConfig, type ApiKeyCreated } from '$lib/api';
 	import { spanDurationMs, spanStatus } from '$lib/api';
-	import TraceRow from '$lib/components/TraceRow.svelte';
 	import { onMount } from 'svelte';
 
 	let traces: Trace[] = $state([]);
 	let traceSpans: Map<string, Span[]> = $state(new Map());
 	let filterText = $state('');
 	let loading = $state(true);
+	let rangeDays: '1d' | '7d' | '30d' = $state('7d');
+	let selectedTraceId: string | null = $state(null);
+	let traceListOpen = $state(true);
 
 	type TraceStatus = 'failed' | 'running' | 'completed';
 	type TraceInsights = {
@@ -91,12 +93,18 @@ with client.trace("summarize-doc") as t:
 
 	async function loadTraces() {
 		try {
-			// Two calls in parallel instead of N+1
-			const [traceResult, spanResult] = await Promise.all([
-				getTraces(),
-				getSpans()
-			]);
-			traces = traceResult.items.sort(
+			// Load all trace pages so the picker is complete
+			let allTraces: Trace[] = [];
+			let cursor: string | null = null;
+			for (let i = 0; i < 20; i++) {
+				const page = await getTraces(cursor ? { cursor } : undefined);
+				allTraces = allTraces.concat(page.items);
+				if (!page.has_more || !page.next_cursor) break;
+				cursor = page.next_cursor;
+			}
+
+			const spanResult = await getSpans();
+			traces = allTraces.sort(
 				(a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime()
 			);
 
@@ -224,6 +232,88 @@ with client.trace("summarize-doc") as t:
 		});
 	});
 
+	const listedRows = $derived.by(() => {
+		return filtered.map((trace) => {
+			const spans = traceSpans.get(trace.id) ?? [];
+			const insights = traceInsights.get(trace.id) ?? toInsights(spans);
+			const root = spans.find((s) => !s.parent_id);
+			return {
+				id: trace.id,
+				startedAt: trace.started_at,
+				rootName: root?.name ?? 'trace',
+				status: insights.status,
+				duration: insights.totalDuration,
+				tokens: insights.totalTokens,
+				model: insights.models[0] ?? '-'
+			};
+		});
+	});
+
+	const histogram = $derived.by(() => {
+		const now = Date.now();
+		const days = rangeDays === '1d' ? 1 : rangeDays === '7d' ? 7 : 30;
+		const start = now - days * 24 * 60 * 60 * 1000;
+		const bucketCount = Math.min(days * 2, 24);
+		const bucketMs = (now - start) / bucketCount;
+		const buckets = Array.from({ length: bucketCount }, (_, i) => ({ idx: i, count: 0 }));
+		for (const row of listedRows) {
+			const ts = new Date(row.startedAt).getTime();
+			if (ts < start || ts > now) continue;
+			const idx = Math.min(bucketCount - 1, Math.max(0, Math.floor((ts - start) / bucketMs)));
+			buckets[idx].count += 1;
+		}
+		const max = Math.max(1, ...buckets.map((b) => b.count));
+		return { buckets, max };
+	});
+
+	const selectedTraceRow = $derived.by(() => listedRows.find((r) => r.id === selectedTraceId) ?? listedRows[0] ?? null);
+	const selectedTraceSpans = $derived.by(() => {
+		if (!selectedTraceRow) return [] as Span[];
+		const spans = traceSpans.get(selectedTraceRow.id) ?? [];
+		return [...spans]
+			.sort((a, b) => new Date(a.started_at).getTime() - new Date(b.started_at).getTime());
+	});
+	let selectedPreviewSpanId = $state<string | null>(null);
+	const selectedPreviewSpan = $derived.by(
+		() => selectedTraceSpans.find((s) => s.id === selectedPreviewSpanId) ?? selectedTraceSpans[0] ?? null
+	);
+
+	function formatDuration(ms: number | null): string {
+		if (ms == null) return '-';
+		if (ms < 1000) return `${ms}ms`;
+		return `${(ms / 1000).toFixed(2)}s`;
+	}
+
+	function spanTokenTotal(s: Span | null): number {
+		if (!s || s.kind?.type !== 'llm_call') return 0;
+		return (s.kind.input_tokens ?? 0) + (s.kind.output_tokens ?? 0);
+	}
+
+	function spanCost(s: Span | null): string {
+		if (!s || s.kind?.type !== 'llm_call' || s.kind.cost == null) return '0.000';
+		return s.kind.cost.toFixed(3);
+	}
+
+	$effect(() => {
+		if (listedRows.length === 0) {
+			selectedTraceId = null;
+			return;
+		}
+		if (!selectedTraceId || !listedRows.some((r) => r.id === selectedTraceId)) {
+			selectedTraceId = listedRows[0].id;
+		}
+	});
+
+	$effect(() => {
+		if (selectedTraceSpans.length === 0) {
+			selectedPreviewSpanId = null;
+			return;
+		}
+		if (!selectedPreviewSpanId || !selectedTraceSpans.some((s) => s.id === selectedPreviewSpanId)) {
+			selectedPreviewSpanId = selectedTraceSpans[0].id;
+		}
+	});
+
 </script>
 
 <div class="app-shell-wide space-y-4">
@@ -326,42 +416,56 @@ with client.trace("summarize-doc") as t:
 			</div>
 		</div>
 	{:else}
-		<div class="space-y-4 pb-10">
-			<div class="flex items-center justify-between">
-				<div>
-					<h1 class="text-xl font-bold">Traces</h1>
-					<p class="text-xs text-text-muted mt-1">Use the floating search bar to find traces quickly.</p>
-				</div>
-				<div class="text-[11px] text-text-muted">{filtered.length} / {traces.length} visible</div>
+		<div class="space-y-3 pb-10">
+			<div class="flex items-center gap-1.5">
+				<button class="query-chip query-chip-active">Traces</button>
+				<a class="query-chip" href="/spans">Spans</a>
+				<a class="query-chip" href="/sessions">Sessions</a>
+				<div class="flex-1"></div>
+				<input class="control-input h-8 text-[12px] w-72" placeholder="Search text, name, id, tags..." bind:value={filterText} />
+				<select bind:value={rangeDays} class="control-select h-8 w-[74px] text-[12px]">
+					<option value="1d">1d</option>
+					<option value="7d">7d</option>
+					<option value="30d">30d</option>
+				</select>
 			</div>
 
-			<div class="table-float">
-				<div class="grid grid-cols-[1fr_140px_80px_80px_80px_80px_80px_60px] gap-3 px-3.5 py-2 table-head-compact">
-					<span>Trace</span>
-					<span>Timestamp</span>
-					<span class="text-center">Status</span>
-					<span class="text-right">Duration</span>
-					<span class="text-right">Tokens</span>
-					<span class="text-right">Cost</span>
-					<span>Model</span>
-					<span></span>
-				</div>
-
-				{#if filtered.length === 0}
-					<div class="text-text-muted text-sm text-center py-8">No traces match your search</div>
-				{:else}
-					<div>
-						{#each filtered as trace (trace.id)}
-							<TraceRow traceId={trace.id} spans={traceSpans.get(trace.id) ?? []} onDelete={(id) => {
-								traces = traces.filter(t => t.id !== id);
-								traceSpans.delete(id);
-								traceSpans = new Map(traceSpans);
-							}} />
+			<div class="table-float overflow-hidden">
+				<div class="p-2.5 border-b border-border/55">
+					<div class="h-24 rounded-lg border border-border/55 bg-bg-secondary/22 p-2 flex items-end gap-1.5">
+						{#each histogram.buckets as b}
+							<div class="flex-1 rounded-sm bg-accent/75 min-h-[3px]" style={`height:${Math.max(3, (b.count / histogram.max) * 100)}%`}></div>
 						{/each}
 					</div>
+					<div class="text-[11px] text-text-muted mt-1.5">Total: {filtered.length} / {traces.length}</div>
+				</div>
+
+				<div class="grid grid-cols-[190px_1fr_110px_150px_110px_100px_70px] gap-3 px-3 py-2 table-head-compact border-b border-border/55">
+					<span>ID</span>
+					<span>Top level span</span>
+					<span>Status</span>
+					<span>Model</span>
+					<span class="text-right">Tokens</span>
+					<span class="text-right">Duration</span>
+					<span class="text-right">Open</span>
+				</div>
+
+				{#if listedRows.length === 0}
+					<div class="py-8 text-center text-sm text-text-muted">No traces match current filters</div>
+				{:else}
+					{#each listedRows as row (row.id)}
+						<a href={`/traces/${row.id}`} class="grid grid-cols-[190px_1fr_110px_150px_110px_100px_70px] gap-3 px-3 py-2 border-b border-border/45 hover:bg-bg-secondary/35 motion-row items-center">
+							<span class="font-mono text-[12px] truncate">{shortId(row.id)}</span>
+							<span class="truncate text-[13px]">{row.rootName}</span>
+							<span class="text-[12px] capitalize {row.status === 'failed' ? 'text-danger' : row.status === 'running' ? 'text-warning' : 'text-success'}">{row.status}</span>
+							<span class="text-[12px] text-text-muted truncate">{row.model}</span>
+							<span class="text-right text-[12px] font-mono text-text-muted">{row.tokens.toLocaleString()}</span>
+							<span class="text-right text-[12px] font-mono text-text-muted">{row.duration}ms</span>
+							<span class="text-right text-[11px] text-accent">Open</span>
+						</a>
+					{/each}
 				{/if}
 			</div>
-
 		</div>
 	{/if}
 </div>

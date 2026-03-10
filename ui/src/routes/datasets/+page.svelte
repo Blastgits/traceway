@@ -135,14 +135,14 @@
 		</form>
 	{/if}
 
-	<div class="table-float p-2 space-y-2">
+	<div class="table-float p-2 space-y-2 motion-rise-in">
 		<div class="flex items-center gap-1.5 flex-wrap">
 			<div class="relative">
-				<button class="btn-secondary h-7 text-[12px]" onclick={() => { filterMenuOpen = !filterMenuOpen; columnsMenuOpen = false; }}>
+				<button class="btn-secondary h-7 text-[12px] motion-interactive" onclick={() => { filterMenuOpen = !filterMenuOpen; columnsMenuOpen = false; }}>
 					+ Add filter
 				</button>
 				{#if filterMenuOpen}
-					<div class="absolute left-0 top-full mt-1 z-20 w-44 surface-panel p-1.5">
+					<div class="absolute left-0 top-full mt-1 z-20 w-44 surface-panel p-1.5 motion-rise-in">
 						<button class="w-full text-left px-2 py-1.5 rounded-md hover:bg-bg-tertiary/60 text-[12px] {filterMode === 'all' ? 'text-text' : 'text-text-secondary'}" onclick={() => { filterMode = 'all'; filterMenuOpen = false; }}>All datasets</button>
 						<button class="w-full text-left px-2 py-1.5 rounded-md hover:bg-bg-tertiary/60 text-[12px] {filterMode === 'nonempty' ? 'text-text' : 'text-text-secondary'}" onclick={() => { filterMode = 'nonempty'; filterMenuOpen = false; }}>Has datapoints</button>
 						<button class="w-full text-left px-2 py-1.5 rounded-md hover:bg-bg-tertiary/60 text-[12px] {filterMode === 'empty' ? 'text-text' : 'text-text-secondary'}" onclick={() => { filterMode = 'empty'; filterMenuOpen = false; }}>Empty datasets</button>
@@ -151,9 +151,9 @@
 			</div>
 
 			<div class="relative">
-				<button class="btn-secondary h-7 text-[12px]" onclick={() => { columnsMenuOpen = !columnsMenuOpen; filterMenuOpen = false; }}>Columns</button>
+				<button class="btn-secondary h-7 text-[12px] motion-interactive" onclick={() => { columnsMenuOpen = !columnsMenuOpen; filterMenuOpen = false; }}>Columns</button>
 				{#if columnsMenuOpen}
-					<div class="absolute left-0 top-full mt-1 z-20 w-44 surface-panel p-2 space-y-1.5 text-[12px]">
+					<div class="absolute left-0 top-full mt-1 z-20 w-44 surface-panel p-2 space-y-1.5 text-[12px] motion-rise-in">
 						<label class="flex items-center gap-2"><input type="checkbox" bind:checked={showIdCol} class="accent-accent" /> ID</label>
 						<label class="flex items-center gap-2"><input type="checkbox" bind:checked={showCountCol} class="accent-accent" /> Datapoints</label>
 						<label class="flex items-center gap-2"><input type="checkbox" bind:checked={showCreatedCol} class="accent-accent" /> Created</label>
@@ -198,7 +198,7 @@
 					</thead>
 					<tbody>
 						{#each visibleDatasets as ds (ds.id)}
-							<tr class="border-b border-border/35 hover:bg-bg-secondary/40 transition-colors">
+							<tr class="border-b border-border/35 hover:bg-bg-secondary/40 motion-row">
 								<td class="px-2.5 py-2.5">
 									<input type="checkbox" class="accent-accent" />
 								</td>

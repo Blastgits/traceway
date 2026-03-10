@@ -16,6 +16,10 @@
 	let searchQuery = $state('');
 	let searchFocused = $state(false);
 	let searchInputEl: HTMLInputElement | undefined = $state(undefined);
+	let showFilters = $state(false);
+	let showMetadata = $state(true);
+	let statusFilter: 'all' | 'running' | 'completed' | 'failed' = $state('all');
+	let kindFilter: 'all' | 'llm_call' | 'fs_read' | 'fs_write' | 'custom' = $state('all');
 
 	// Build suggestion list from current spans
 	const searchSuggestions = $derived.by((): Array<{ label: string; category: string }> => {
@@ -115,7 +119,7 @@
 	let addingSpan = $state(false);
 
 	// Resizable split panel
-	let splitPercent = $state(44);
+	let splitPercent = $state(56);
 	let isDragging = $state(false);
 	let containerEl: HTMLDivElement | undefined = $state(undefined);
 
@@ -308,14 +312,105 @@
 	});
 
 	const parentOptions = $derived(spans.map((s) => ({ id: s.id, name: s.name })));
+
+	const timelineSpans = $derived.by(() => {
+		return spans.filter((s) => {
+			const statusOk = statusFilter === 'all' || spanStatus(s) === statusFilter;
+			const kind = s.kind?.type ?? 'custom';
+			const kindOk = kindFilter === 'all' || kind === kindFilter;
+			return statusOk && kindOk;
+		});
+	});
+
+	const hasActiveFilters = $derived(statusFilter !== 'all' || kindFilter !== 'all');
+
+	const compactTime = $derived.by(() => {
+		if (spans.length === 0) return { min: 0, duration: 1 };
+		const starts = spans.map((s) => new Date(s.started_at).getTime());
+		const ends = spans.map((s) => new Date(s.ended_at ?? s.started_at).getTime());
+		const min = Math.min(...starts);
+		const max = Math.max(...ends, min + 1);
+		return { min, duration: max - min };
+	});
+
+	const compactTicks = $derived.by(() => {
+		const count = 6;
+		return Array.from({ length: count + 1 }, (_, i) => {
+			const ms = (i / count) * compactTime.duration;
+			return {
+				left: (i / count) * 100,
+				label: ms < 1000 ? `${Math.round(ms)}ms` : `${(ms / 1000).toFixed(0)}s`
+			};
+		});
+	});
+
+	const spanDepth = $derived.by(() => {
+		const byParent = new Map<string | null, Span[]>();
+		for (const s of spans) {
+			const key = s.parent_id ?? null;
+			const arr = byParent.get(key) ?? [];
+			arr.push(s);
+			byParent.set(key, arr);
+		}
+		const depth = new Map<string, number>();
+		const walk = (parentId: string | null, d: number) => {
+			for (const s of byParent.get(parentId) ?? []) {
+				depth.set(s.id, d);
+				walk(s.id, d + 1);
+			}
+		};
+		walk(null, 0);
+		return depth;
+	});
+
+	const compactBars = $derived.by(() => {
+		return timelineSpans.map((s) => {
+			const start = new Date(s.started_at).getTime() - compactTime.min;
+			const end = new Date(s.ended_at ?? s.started_at).getTime() - compactTime.min;
+			const left = (start / compactTime.duration) * 100;
+			const width = Math.max(0.8, ((end - start) / compactTime.duration) * 100);
+			const depth = spanDepth.get(s.id) ?? 0;
+			return {
+				span: s,
+				left,
+				width,
+				top: 26 + Math.min(depth, 5) * 7
+			};
+		});
+	});
+
+	function compactBarTone(s: Span): string {
+		if (selectedSpan?.id === s.id) return 'bg-warning';
+		if (!s.kind) return 'bg-accent/75';
+		switch (s.kind.type) {
+			case 'llm_call':
+				return 'bg-accent/90';
+			case 'fs_read':
+			case 'fs_write':
+				return 'bg-warning/85';
+			case 'custom':
+				return 'bg-blue-400/85';
+			default:
+				return 'bg-accent/75';
+		}
+	}
+
+	function clearFilters() {
+		statusFilter = 'all';
+		kindFilter = 'all';
+	}
+
+	function openTraceQuery() {
+		goto(`/query?q=${encodeURIComponent(`trace:${traceId}`)}`);
+	}
 </script>
 
-<div class="w-[min(1880px,calc(100vw-0.75rem))] mx-auto h-[calc(100vh-8rem)] flex flex-col gap-3">
+<div class="w-full max-w-[1880px] mx-auto px-1 h-[calc(100vh-8rem)] flex flex-col gap-3">
 	<!-- Header -->
-	<div class="flex items-center gap-3 px-3.5 py-2.5 shrink-0 app-toolbar-shell rounded-xl">
+	<div class="flex items-center gap-2.5 px-3.5 py-2.5 shrink-0 app-toolbar-shell rounded-xl flex-nowrap min-w-0 overflow-hidden">
 		<a href="/traces" class="text-text-secondary hover:text-text text-[13px]">&larr; Traces</a>
 		<span class="text-text-muted">/</span>
-		<h1 class="text-[13px] font-semibold font-mono">{shortId(traceId)}</h1>
+		<h1 class="text-[13px] font-semibold font-mono min-w-0 truncate max-w-[11rem] sm:max-w-none">{shortId(traceId)}</h1>
 
 		{#if !loading && spans.length > 0}
 			<span class="px-2 py-0.5 rounded text-xs border
@@ -326,7 +421,7 @@
 			</span>
 
 			<!-- Summary stats -->
-			<div class="flex items-center gap-1.5 text-[12px] text-text-secondary font-mono bg-bg-tertiary/35 rounded-md px-2.5 py-1 border border-border/45">
+			<div class="hidden md:flex items-center gap-1.5 text-[12px] text-text-secondary font-mono bg-bg-tertiary/35 rounded-md px-2.5 py-1 border border-border/45 shrink-0">
 				{#if totalDuration !== null}
 					<span class="inline-flex items-center gap-1">
 						<svg class="w-3.5 h-3.5 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
@@ -351,21 +446,22 @@
 				<span class="text-text-muted">{spans.length} spans</span>
 			</div>
 
-			<div class="flex-1"></div>
-			<button
-				class="px-3 py-1.5 text-[12px] bg-accent/10 text-accent border border-accent/20 rounded-lg hover:bg-accent/20 transition-colors duration-150"
-				onclick={() => { showAddSpan = !showAddSpan; if (!showAddSpan) newSpanParent = ''; }}
-			>
-				{showAddSpan ? 'Cancel' : '+ Span'}
-			</button>
-			<button
-				class="px-3 py-1.5 text-[12px] bg-bg-tertiary/70 text-text-secondary border border-border rounded-lg hover:text-text hover:bg-bg-tertiary transition-colors duration-150"
-				onclick={handleExportTrace}
-			>Export</button>
-			<button
-				class="px-3 py-1.5 text-[12px] transition-colors duration-150 border rounded-lg {confirmDeleteTrace ? 'bg-danger/10 text-danger border-danger/30 font-semibold' : 'bg-bg-tertiary/70 text-text-muted border-border hover:text-danger hover:border-danger/30'}"
-				onclick={handleDeleteTrace}
-			>{confirmDeleteTrace ? 'Confirm?' : 'Delete'}</button>
+			<div class="ml-auto flex items-center gap-2 shrink-0">
+				<button
+					class="px-3 py-1.5 text-[12px] bg-accent/10 text-accent border border-accent/20 rounded-lg hover:bg-accent/20 transition-colors duration-150 whitespace-nowrap"
+					onclick={() => { showAddSpan = !showAddSpan; if (!showAddSpan) newSpanParent = ''; }}
+				>
+					{showAddSpan ? 'Cancel' : '+ Span'}
+				</button>
+				<button
+					class="px-3 py-1.5 text-[12px] bg-bg-tertiary/70 text-text-secondary border border-border rounded-lg hover:text-text hover:bg-bg-tertiary transition-colors duration-150 whitespace-nowrap"
+					onclick={handleExportTrace}
+				>Export</button>
+				<button
+					class="px-3 py-1.5 text-[12px] transition-colors duration-150 border rounded-lg whitespace-nowrap {confirmDeleteTrace ? 'bg-danger/10 text-danger border-danger/30 font-semibold' : 'bg-bg-tertiary/70 text-text-muted border-border hover:text-danger hover:border-danger/30'}"
+					onclick={handleDeleteTrace}
+				>{confirmDeleteTrace ? 'Confirm?' : 'Delete'}</button>
+			</div>
 		{/if}
 	</div>
 
@@ -448,12 +544,15 @@
 		>
 			<!-- Left panel: search + span tree -->
 			<div class="min-h-0 min-w-[380px] overflow-hidden flex flex-col table-float rounded-xl" style="width: {splitPercent}%">
-				<div class="px-3 py-2 border-b border-border/55 bg-gradient-to-r from-bg-secondary/70 via-bg-secondary/45 to-transparent">
-					<p class="text-[11px] uppercase tracking-[0.14em] text-text-muted">Trace timeline</p>
+				<div class="px-3 py-2 border-b border-border/55 bg-bg-secondary/20 flex items-center gap-2">
+					<button class="query-chip h-8">Trace</button>
+					<button class="query-chip h-8 text-warning border-warning/45">Chat with trace</button>
+					<div class="flex-1"></div>
+					<button class="query-chip h-8 {showMetadata ? 'query-chip-active' : ''}" onclick={() => (showMetadata = !showMetadata)}>Metadata</button>
 				</div>
-				<!-- Search bar -->
-				<div class="relative shrink-0 border-b border-border/55 bg-bg-secondary/25">
-					<div class="flex items-center px-3 py-1.5 gap-2">
+
+				<div class="relative shrink-0 border-b border-border/55 bg-bg-secondary/20">
+					<div class="flex items-center px-3 py-2 gap-2">
 						<svg class="w-3.5 h-3.5 text-text-muted shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 							<path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
 						</svg>
@@ -463,25 +562,69 @@
 							onfocus={() => searchFocused = true}
 							onblur={() => setTimeout(() => searchFocused = false, 150)}
 							type="text"
-							placeholder="Search spans...  /"
+							placeholder="Search text, name, id, tags..."
 							class="flex-1 bg-transparent text-[13px] text-text placeholder:text-text-muted/50 focus:outline-none"
 						/>
-						{#if searchQuery}
-							<button
-							class="text-text-muted hover:text-text text-xs shrink-0 transition-colors duration-150"
-							onclick={() => { searchQuery = ''; searchInputEl?.focus(); }}
-							aria-label="Clear search"
-							>
-								<svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-									<path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
-								</svg>
-							</button>
-						{/if}
 					</div>
+				</div>
 
-					<!-- Autocomplete suggestions -->
-					{#if searchFocused && searchQuery.trim() && searchSuggestions.length > 0}
-						<div class="absolute left-0 right-0 top-full z-20 bg-bg-secondary/95 border border-border border-t-0 rounded-b-lg shadow-[0_20px_36px_-30px_rgba(0,0,0,0.9)] overflow-hidden backdrop-blur-sm">
+				<div class="px-3 py-2 border-b border-border/55 bg-bg-secondary/20">
+					<div class="relative h-20 rounded-md border border-border/50 bg-bg-secondary/35 overflow-hidden">
+						{#each compactTicks as tick}
+							<div class="absolute top-0 bottom-0 border-l border-border/35" style={`left:${tick.left}%`}>
+								<span class="absolute top-1 left-1 text-[10px] text-text-muted font-mono">{tick.label}</span>
+							</div>
+						{/each}
+						<div class="absolute left-0 right-0 top-5 border-t border-border/35"></div>
+						{#each compactBars as b (b.span.id)}
+							<button
+								type="button"
+								class="absolute h-1.5 rounded {compactBarTone(b.span)}"
+								style={`left:${b.left}%; width:${b.width}%; top:${b.top}px`}
+								onclick={() => selectSpan(b.span)}
+								aria-label={`Select ${b.span.name}`}
+							></button>
+						{/each}
+					</div>
+				</div>
+				<div class="px-3 py-2 border-b border-border/55 bg-gradient-to-r from-bg-secondary/70 via-bg-secondary/45 to-transparent space-y-2">
+					<div class="flex items-center gap-2 flex-wrap min-w-0">
+						<p class="text-[11px] uppercase tracking-[0.14em] text-text-muted">Trace timeline</p>
+						<div class="flex-1"></div>
+						<button class="query-chip h-7 whitespace-nowrap {searchFocused ? 'query-chip-active' : ''}" onclick={() => searchInputEl?.focus()}>Search</button>
+						<button class="query-chip h-7" onclick={() => (showFilters = !showFilters)}>
+							Filters
+							{#if hasActiveFilters}
+								<span class="ml-1 text-[10px] text-warning">{statusFilter !== 'all' ? statusFilter : kindFilter}</span>
+							{/if}
+						</button>
+						<button class="query-chip h-7 whitespace-nowrap {showMetadata ? 'query-chip-active' : ''}" onclick={() => (showMetadata = !showMetadata)}>Metadata</button>
+						<button class="query-chip h-7 whitespace-nowrap" onclick={openTraceQuery}>Ask</button>
+					</div>
+					{#if showFilters}
+						<div class="flex flex-wrap items-center gap-1.5 bg-bg-tertiary/35 border border-border/50 rounded-lg p-1.5">
+							<select bind:value={statusFilter} class="control-select h-7 text-[12px] w-28">
+								<option value="all">All status</option>
+								<option value="running">Running</option>
+								<option value="completed">Completed</option>
+								<option value="failed">Failed</option>
+							</select>
+							<select bind:value={kindFilter} class="control-select h-7 text-[12px] w-28">
+								<option value="all">All kinds</option>
+								<option value="llm_call">LLM call</option>
+								<option value="fs_read">File read</option>
+								<option value="fs_write">File write</option>
+								<option value="custom">Custom</option>
+							</select>
+							<button class="btn-ghost h-7 text-[12px]" onclick={clearFilters}>Reset</button>
+							<div class="text-[11px] text-text-muted ml-auto">{timelineSpans.length}/{spans.length}</div>
+						</div>
+					{/if}
+				</div>
+				<!-- Autocomplete suggestions -->
+				{#if searchFocused && searchQuery.trim() && searchSuggestions.length > 0}
+					<div class="relative">
+						<div class="absolute left-3 right-3 top-0 z-20 bg-bg-secondary/95 border border-border rounded-lg shadow-[0_20px_36px_-30px_rgba(0,0,0,0.9)] overflow-hidden backdrop-blur-sm">
 							{#each searchSuggestions as suggestion}
 								<button
 									class="w-full flex items-center gap-2 px-3 py-1.5 text-left hover:bg-bg-tertiary/85 transition-colors duration-150"
@@ -492,12 +635,13 @@
 								</button>
 							{/each}
 						</div>
-					{/if}
-				</div>
+					</div>
+				{/if}
 
 				<TraceTimeline
-					{spans}
+					spans={timelineSpans}
 					{searchQuery}
+					{showMetadata}
 					selectedId={selectedSpan?.id ?? null}
 					onSelect={selectSpan}
 				/>
@@ -516,7 +660,7 @@
 			</div>
 
 			<!-- Right panel: span detail -->
-			<div class="flex-1 min-h-0 min-w-[420px] overflow-y-auto table-float rounded-xl">
+			<div class="flex-1 min-h-0 min-w-[440px] max-w-[44%] overflow-y-auto table-float rounded-xl">
 				<div class="px-3 py-2 border-b border-border/55 bg-gradient-to-r from-bg-secondary/70 via-bg-secondary/45 to-transparent sticky top-0 z-10 backdrop-blur-md">
 					<p class="text-[11px] uppercase tracking-[0.14em] text-text-muted">Span inspection</p>
 				</div>
