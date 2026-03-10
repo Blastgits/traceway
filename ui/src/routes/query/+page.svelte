@@ -1182,9 +1182,9 @@
 
 	<!-- Floating command bar -->
 	<div class="fixed left-1/2 bottom-3 -translate-x-1/2 z-40 w-[min(1080px,calc(100vw-1.25rem))]">
-		<div class="relative surface-command query-command-shell p-2 sm:p-2.5" role="search" aria-label="Trace query command bar">
+		<div class="relative surface-command query-command-shell p-2 sm:p-2.5 motion-rise-in" role="search" aria-label="Trace query command bar">
 			{#if pickerMenuOpen}
-				<div class="absolute left-0 bottom-full mb-2 w-72 query-float-strong rounded-xl border border-border/70 shadow-xl overflow-hidden z-30">
+				<div class="absolute left-0 bottom-full mb-2 w-72 query-float-strong rounded-xl border border-border/70 shadow-xl overflow-hidden z-30 motion-rise-in">
 					<div class="px-3 py-2 border-b border-border/60 text-[11px] text-text-muted uppercase tracking-[0.12em]">Add filter</div>
 					<div class="max-h-72 overflow-y-auto p-1.5 space-y-0.5">
 						{#each pickerMenuItems as item}
@@ -1201,7 +1201,7 @@
 			{/if}
 
 			{#if activePicker}
-				<div class="absolute left-0 right-0 bottom-full mb-2 query-float-strong rounded-xl border border-border/70 shadow-xl overflow-hidden">
+				<div class="absolute left-0 right-0 bottom-full mb-2 query-float-strong rounded-xl border border-border/70 shadow-xl overflow-hidden motion-rise-in">
 					<div class="px-3 py-2 border-b border-border/60 flex items-center gap-2">
 						<input
 							bind:value={pickerSearch}
@@ -1230,7 +1230,7 @@
 			{/if}
 
 			{#if searchFocused && suggestions.length > 0}
-				<div class="absolute left-0 right-0 bottom-full mb-2 z-30 query-float-strong rounded-xl shadow-xl overflow-hidden">
+				<div class="absolute left-0 right-0 bottom-full mb-2 z-30 query-float-strong rounded-xl shadow-xl overflow-hidden motion-rise-in">
 					{#each suggestions as s, i}
 						<button
 							class="w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors
@@ -1249,7 +1249,7 @@
 			{/if}
 
 			{#if searchFocused && !dslInput.trim() && history.length > 0 && suggestions.length === 0}
-				<div class="absolute left-0 right-0 bottom-full mb-2 z-30 query-float-strong rounded-xl shadow-xl overflow-hidden">
+				<div class="absolute left-0 right-0 bottom-full mb-2 z-30 query-float-strong rounded-xl shadow-xl overflow-hidden motion-rise-in">
 					<div class="px-3 py-1.5 border-b border-border/70 flex items-center justify-between">
 						<span class="text-[10px] uppercase tracking-wider text-text-muted">Recent queries</span>
 						<button class="text-[10px] text-text-muted hover:text-danger transition-colors" onmousedown={clearHistory}>clear</button>
@@ -1267,7 +1267,7 @@
 			{/if}
 
 			<div class="flex items-center gap-1.5 flex-wrap">
-				<button class="query-chip" onclick={() => (pickerMenuOpen = !pickerMenuOpen)}>
+				<button class="query-chip motion-interactive" onclick={() => (pickerMenuOpen = !pickerMenuOpen)}>
 					<span class="text-text-secondary">Filter by</span>
 					<svg class="w-3.5 h-3.5 text-text-muted transition-transform {pickerMenuOpen ? 'rotate-180' : ''}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 						<path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
@@ -1323,10 +1323,10 @@
 							</svg>
 						</button>
 					{/each}
-					<button onclick={clearAllFilters} class="query-chip text-text-muted hover:text-text">Clear all</button>
+					<button onclick={clearAllFilters} class="query-chip text-text-muted hover:text-text motion-interactive">Clear all</button>
 				{:else if !hasQueried}
 					{#each presets.slice(0, 4) as preset}
-						<button onclick={() => applyPreset(preset)} class="query-chip text-text-secondary hover:text-text">{preset.label}</button>
+						<button onclick={() => applyPreset(preset)} class="query-chip text-text-secondary hover:text-text motion-interactive">{preset.label}</button>
 					{/each}
 				{/if}
 

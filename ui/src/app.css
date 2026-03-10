@@ -28,6 +28,70 @@ html {
 	--radius-control: 0.62rem;
 	--shadow-panel: 0 22px 52px -32px rgba(4, 14, 38, 0.78);
 	--shadow-float: 0 16px 30px -24px rgba(4, 14, 38, 0.8);
+	--motion-fast: 100ms;
+	--motion-base: 160ms;
+	--motion-slow: 220ms;
+	--ease-standard: cubic-bezier(0.2, 0.78, 0.2, 1);
+	--ease-decelerate: cubic-bezier(0.16, 0.84, 0.28, 1);
+}
+
+@keyframes fade-in {
+	from { opacity: 0; }
+	to { opacity: 1; }
+}
+
+@keyframes rise-in {
+	from { opacity: 0; transform: translateY(8px) scale(0.99); }
+	to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes slide-in-right {
+	from { opacity: 0; transform: translateX(18px); }
+	to { opacity: 1; transform: translateX(0); }
+}
+
+.motion-fade-in {
+	animation: fade-in var(--motion-base) var(--ease-standard);
+}
+
+.motion-rise-in {
+	animation: rise-in var(--motion-base) var(--ease-decelerate);
+}
+
+.motion-slide-in-right {
+	animation: slide-in-right var(--motion-slow) var(--ease-decelerate);
+}
+
+.motion-interactive {
+	transition: transform var(--motion-fast) var(--ease-standard), box-shadow var(--motion-fast) var(--ease-standard), background-color var(--motion-fast) var(--ease-standard), border-color var(--motion-fast) var(--ease-standard), color var(--motion-fast) var(--ease-standard), opacity var(--motion-fast) var(--ease-standard);
+}
+
+.motion-interactive:hover {
+	transform: translateY(-1px);
+}
+
+.motion-row {
+	transition: background-color var(--motion-fast) var(--ease-standard), transform var(--motion-fast) var(--ease-standard);
+}
+
+.motion-row:hover {
+	transform: translateX(2px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.motion-fade-in,
+	.motion-rise-in,
+	.motion-slide-in-right {
+		animation: none !important;
+	}
+
+	.motion-interactive,
+	.motion-row,
+	.motion-interactive:hover,
+	.motion-row:hover {
+		transition: none !important;
+		transform: none !important;
+	}
 }
 
 html[data-theme='light'] {
@@ -97,7 +161,7 @@ html[data-theme='light'] .glass-surface {
 }
 
 .app-shell-wide {
-	width: min(1880px, calc(100vw - 1.6rem));
+	width: min(1880px, 100%);
 	margin-inline: auto;
 }
 
@@ -119,13 +183,14 @@ html[data-theme='light'] .glass-surface {
 	border-radius: 0.38rem;
 	color: var(--color-text-muted);
 	border: 1px solid transparent;
-	transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+	transition: background-color var(--motion-fast) var(--ease-standard), border-color var(--motion-fast) var(--ease-standard), color var(--motion-fast) var(--ease-standard), transform var(--motion-fast) var(--ease-standard);
 	white-space: nowrap;
 }
 
 .topnav-tab:hover {
 	color: var(--color-text);
 	background: color-mix(in oklab, var(--color-bg-tertiary) 66%, transparent);
+	transform: translateY(-1px);
 }
 
 .topnav-tab-active {
@@ -233,6 +298,7 @@ html[data-theme='light'] .glass-surface {
 	font-size: 0.78rem;
 	border-width: 1px;
 	border-style: solid;
+	animation: rise-in var(--motion-base) var(--ease-decelerate);
 }
 
 .alert-danger {

@@ -31,6 +31,7 @@
 	let editedJson = $state('');
 	let submitting = $state(false);
 	let inspectorWidth: 'compact' | 'default' | 'wide' = $state('default');
+	let actionError = $state('');
 
 	// Derived from reviewingItem for chat rendering
 	const reviewingMessages = $derived(reviewingItem ? extractMessages(reviewingItem.original_data) : null);
@@ -177,23 +178,26 @@
 	function startReview(item: QueueItem) {
 		reviewingItem = item;
 		editedJson = JSON.stringify(item.original_data, null, 2);
+		actionError = '';
 	}
 
 	function closeReview() {
 		reviewingItem = null;
 		editedJson = '';
+		actionError = '';
 	}
 
 	async function handleApprove() {
 		if (!reviewingItem) return;
 		submitting = true;
+		actionError = '';
 		try {
 			// Submit without edits = approve as-is
 			const updated = await submitQueueItem(reviewingItem.id);
 			items = items.map((i) => (i.id === updated.id ? updated : i));
 			closeReview();
-		} catch {
-			// error
+		} catch (err) {
+			actionError = err instanceof Error ? err.message : 'Failed to approve item';
 		}
 		submitting = false;
 	}
@@ -201,13 +205,14 @@
 	async function handleSubmitEdited() {
 		if (!reviewingItem) return;
 		submitting = true;
+		actionError = '';
 		try {
 			const data = JSON.parse(editedJson);
 			const updated = await submitQueueItem(reviewingItem.id, data);
 			items = items.map((i) => (i.id === updated.id ? updated : i));
 			closeReview();
-		} catch {
-			// parse error or API error
+		} catch (err) {
+			actionError = err instanceof Error ? err.message : 'Failed to submit edited item';
 		}
 		submitting = false;
 	}
@@ -243,9 +248,9 @@
 	</div>
 
 	<!-- Status filter tabs + counts -->
-	<div class="app-toolbar-shell rounded-xl p-2 flex items-center gap-1.5 flex-wrap">
+	<div class="app-toolbar-shell rounded-xl p-2 flex items-center gap-1.5 flex-wrap motion-rise-in">
 		<button
-			class="query-chip {statusFilter === 'pending' ? 'query-chip-active' : ''}"
+			class="query-chip motion-interactive {statusFilter === 'pending' ? 'query-chip-active' : ''}"
 			onclick={() => statusFilter = 'pending'}
 		>
 			Pending
@@ -254,7 +259,7 @@
 			{/if}
 		</button>
 		<button
-			class="query-chip {statusFilter === 'claimed' ? 'query-chip-active' : ''}"
+			class="query-chip motion-interactive {statusFilter === 'claimed' ? 'query-chip-active' : ''}"
 			onclick={() => statusFilter = 'claimed'}
 		>
 			Claimed
@@ -263,7 +268,7 @@
 			{/if}
 		</button>
 		<button
-			class="query-chip {statusFilter === 'completed' ? 'query-chip-active' : ''}"
+			class="query-chip motion-interactive {statusFilter === 'completed' ? 'query-chip-active' : ''}"
 			onclick={() => statusFilter = 'completed'}
 		>
 			Completed
@@ -272,7 +277,7 @@
 			{/if}
 		</button>
 		<button
-			class="query-chip {statusFilter === 'all' ? 'query-chip-active' : ''}"
+			class="query-chip motion-interactive {statusFilter === 'all' ? 'query-chip-active' : ''}"
 			onclick={() => statusFilter = 'all'}
 		>
 			All
@@ -301,7 +306,7 @@
 		</div>
 	{:else}
 		<!-- Item list -->
-		<div class="table-float divide-y divide-border/35">
+		<div class="table-float divide-y divide-border/35 motion-rise-in">
 			<div class="grid grid-cols-[80px_1fr_110px_92px_70px] gap-3 px-4 py-2 table-head-compact border-b border-border/55">
 				<span>Dataset</span>
 				<span>Preview</span>
@@ -311,7 +316,7 @@
 			</div>
 			{#each filteredItems as item (item.id)}
 				<button
-					class="w-full grid grid-cols-[80px_1fr_110px_92px_70px] gap-3 items-center px-4 py-2.5 transition-colors text-left
+					class="w-full grid grid-cols-[80px_1fr_110px_92px_70px] gap-3 items-center px-4 py-2.5 transition-colors text-left motion-row
 						{reviewingItem?.id === item.id
 							? 'bg-accent/5'
 							: 'hover:bg-bg-tertiary/20'}"
@@ -363,6 +368,9 @@
 		>
 			{#if reviewingItem}
 				<div class="space-y-3">
+					{#if actionError}
+						<div class="alert-danger text-[12px]">{actionError}</div>
+					{/if}
 					{#if reviewingMessages}
 						<div class="space-y-2">
 							<div class="text-xs text-text-muted uppercase mb-1">Conversation</div>

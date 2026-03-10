@@ -10,16 +10,18 @@
 		spans,
 		selectedId = null,
 		onSelect,
-		searchQuery = ''
+		searchQuery = '',
+		showMetadata = true,
 	}: {
 		spans: Span[];
 		selectedId?: string | null;
 		onSelect?: (span: Span) => void;
 		searchQuery?: string;
+		showMetadata?: boolean;
 	} = $props();
 
 	// ── Constants ──────────────────────────────────────────────────────
-	const SPAN_ROW_HEIGHT = 40;
+	const SPAN_ROW_HEIGHT = 44;
 	const PREVIEW_LINE_HEIGHT = 19;
 	const PREVIEW_PADDING = 8; // py-1 top+bottom
 	const OVERSCAN = 10;
@@ -127,13 +129,6 @@
 		const hasChildren = childIndex.has(span.id);
 		const descendantCount = hasChildren ? countDescendants(span.id) : 0;
 		result.push({ type: 'span', span, depth, hasChildren, descendantCount, height: SPAN_ROW_HEIGHT });
-
-		// Add a content preview row for LLM calls with output
-		const preview = extractPreviewText(span);
-		if (preview && span.kind?.type === 'llm_call') {
-			const text = preview.slice(0, 200);
-			result.push({ type: 'preview', span, depth, text, height: previewHeight(text) });
-		}
 	}
 
 	const flatTree = $derived.by((): TreeNode[] => {
@@ -239,6 +234,11 @@
 
 	function modelBadge(s: Span): string | null {
 		if (s.kind?.type === 'llm_call') return s.kind.model;
+		return null;
+	}
+
+	function providerBadge(s: Span): string | null {
+		if (s.kind?.type === 'llm_call') return s.kind.provider ?? null;
 		return null;
 	}
 
@@ -354,7 +354,7 @@
 	});
 </script>
 
-<div class="flex flex-col h-full min-h-0 bg-transparent">
+	<div class="flex flex-col h-full min-h-0 bg-transparent">
 	<!-- Toolbar -->
 	<div class="flex items-center gap-2 px-3 py-2.5 border-b border-border/55 shrink-0 bg-bg-secondary/30 backdrop-blur-sm">
 		{#if viewMode === 'tree' || viewMode === 'flat'}
@@ -391,7 +391,7 @@
 		<div
 			bind:this={scrollContainer}
 			bind:clientHeight={containerHeight}
-			class="flex-1 min-h-0 overflow-y-auto"
+			class="flex-1 min-h-0 overflow-y-auto bg-[radial-gradient(120%_140%_at_50%_0%,rgba(255,255,255,0.02),transparent_65%)]"
 			onscroll={onScroll}
 		>
 			<div class="relative" style="height: {totalHeight}px">
@@ -421,12 +421,13 @@
 						{@const status = spanStatus(s)}
 						{@const duration = spanDurationMs(s)}
 						{@const model = modelBadge(s)}
+						{@const provider = providerBadge(s)}
 						{@const tokens = tokenCount(s)}
 						{@const cost = costBadge(s)}
 						{@const bytes = bytesBadge(s)}
 						<div
 							class="absolute left-0 right-0 flex items-center text-xs transition-all duration-150 group
-								{selectedId === s.id ? 'bg-accent/12 border-l-2 border-l-accent shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--color-accent)_22%,transparent)]' : 'hover:bg-bg-tertiary/75 border-l-2 border-l-transparent'}"
+								{selectedId === s.id ? 'bg-warning/14 border-l-2 border-l-warning shadow-[inset_0_0_0_1px_rgba(245,158,11,0.22)]' : 'hover:bg-bg-tertiary/70 border-l-2 border-l-transparent'}"
 							style="top: {topPx}px; height: {node.height}px"
 							role="button"
 							tabindex={0}
@@ -438,7 +439,11 @@
 							<div class="flex items-center gap-1.5 flex-1 px-2.5 overflow-hidden min-w-0">
 								<!-- Indent + collapse -->
 								{#if viewMode === 'tree'}
-									<div class="flex items-center shrink-0" style="width: {node.depth * INDENT_PX + 20}px">
+									<div class="relative flex items-center shrink-0" style="width: {node.depth * INDENT_PX + 20}px">
+										{#if node.depth > 0}
+											<div class="absolute top-0 bottom-0 border-l border-border/35" style="left: {node.depth * INDENT_PX - 10}px"></div>
+											<div class="absolute top-1/2 border-t border-border/35 w-2.5" style="left: {node.depth * INDENT_PX - 10}px"></div>
+										{/if}
 										<div style="width: {node.depth * INDENT_PX}px"></div>
 										{#if node.hasChildren}
 										<button
@@ -467,22 +472,28 @@
 									<SpanKindIcon span={s} />
 								</div>
 
-								<!-- Name -->
-								<span class="text-text truncate text-[13px] font-medium">{s.name}</span>
+							<!-- Name -->
+							<span class="text-text truncate text-[13px] font-medium max-w-[40%] tracking-[0.01em]">{s.name}</span>
 
-								<!-- Inline badges -->
-								{#if model}
-									<span class="shrink-0 text-purple-400 text-[11px] bg-purple-400/10 border border-purple-400/25 rounded px-1 py-px">{model}</span>
-								{/if}
-								{#if tokens}
-									<span class="shrink-0 text-text-muted text-[11px] bg-bg-tertiary/45 border border-border/45 rounded px-1 py-px">{tokens}tok</span>
-								{/if}
-								{#if cost}
-									<span class="shrink-0 text-success text-[11px]">{cost}</span>
-								{/if}
-								{#if bytes}
-									<span class="shrink-0 text-text-muted text-[11px] bg-bg-tertiary/45 border border-border/45 rounded px-1 py-px">{bytes}</span>
-								{/if}
+							<!-- Primary metadata -->
+							<span class="shrink-0 text-[11px] text-text-secondary bg-bg-tertiary/55 border border-border/55 rounded px-1.5 py-px font-mono">{formatDuration(duration)}</span>
+
+							<!-- Inline badges -->
+							{#if showMetadata && model}
+								<span class="shrink-0 text-[11px] text-accent bg-accent/10 border border-accent/30 rounded px-1.5 py-px max-w-[32%] truncate">{model}</span>
+							{/if}
+							{#if showMetadata && provider}
+								<span class="shrink-0 text-[11px] text-text-muted bg-bg-tertiary/50 border border-border/50 rounded px-1.5 py-px">{provider}</span>
+							{/if}
+							{#if showMetadata && tokens}
+								<span class="shrink-0 text-text-muted text-[11px] bg-bg-tertiary/45 border border-border/45 rounded px-1.5 py-px">{tokens}</span>
+							{/if}
+							{#if showMetadata && cost}
+								<span class="shrink-0 text-success text-[11px] bg-success/10 border border-success/25 rounded px-1.5 py-px">{cost}</span>
+							{/if}
+							{#if showMetadata && bytes}
+								<span class="shrink-0 text-text-muted text-[11px] bg-bg-tertiary/45 border border-border/45 rounded px-1.5 py-px">{bytes}</span>
+							{/if}
 
 								<!-- Collapsed count -->
 								{#if node.hasChildren && collapsed.has(s.id)}
@@ -491,8 +502,7 @@
 							</div>
 
 							<!-- Duration / offset (right side) -->
-							<div class="shrink-0 flex flex-col items-end pr-3 text-right min-w-18">
-								<span class="text-[12px] text-text-secondary font-mono">{formatDuration(duration)}</span>
+							<div class="shrink-0 flex flex-col items-end pr-3 text-right min-w-16">
 								<span class="text-[11px] text-text-muted font-mono">{relativeOffset(s)}</span>
 							</div>
 						</div>

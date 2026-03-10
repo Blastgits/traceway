@@ -16,18 +16,31 @@
 	} = $props();
 
 	// ── Constants ──────────────────────────────────────────────────────
-	const ROW_HEIGHT = 42;
+	const ROW_HEIGHT = 44;
 	const INDENT_PX = 16;
-	const LABEL_WIDTH = 320;
+	const LABEL_WIDTH = 420;
 	const MIN_BAR_PX = 3;
 
 	// ── Zoom ──────────────────────────────────────────────────────────
 	let zoom = $state(1);
 	let scrollContainer: HTMLDivElement | undefined = $state(undefined);
+	type FilterMode = 'all' | 'llm' | 'file' | 'custom' | 'failed';
+	let filterMode: FilterMode = $state('all');
+	let showMetadata = $state(true);
 
 	function zoomIn() { zoom = Math.min(zoom * 1.5, 20); }
 	function zoomOut() { zoom = Math.max(zoom / 1.5, 0.5); }
 	function zoomReset() { zoom = 1; }
+
+	function matchesFilter(s: Span): boolean {
+		if (filterMode === 'all') return true;
+		if (filterMode === 'failed') return spanStatus(s) === 'failed';
+		if (!s.kind) return false;
+		if (filterMode === 'llm') return s.kind.type === 'llm_call';
+		if (filterMode === 'file') return s.kind.type === 'fs_read' || s.kind.type === 'fs_write';
+		if (filterMode === 'custom') return s.kind.type === 'custom';
+		return true;
+	}
 
 	// ── Child index ───────────────────────────────────────────────────
 	const childIndex = $derived.by(() => {
@@ -75,7 +88,7 @@
 				(a, b) => new Date(spanStartedAt(a)).getTime() - new Date(spanStartedAt(b)).getTime()
 			);
 			for (const span of sorted) {
-				if (query && !span.name.toLowerCase().includes(query) && !kindLabel(span).toLowerCase().includes(query)) {
+				if ((query && !span.name.toLowerCase().includes(query) && !kindLabel(span).toLowerCase().includes(query)) || !matchesFilter(span)) {
 					walk(span.id, depth + 1);
 					continue;
 				}
@@ -100,6 +113,8 @@
 		walk(null, 0);
 		return result;
 	});
+
+	const maxDepth = $derived.by(() => rows.reduce((max, r) => Math.max(max, r.depth), 0));
 
 	// ── Time axis ticks ───────────────────────────────────────────────
 	const ticks = $derived.by(() => {
@@ -135,15 +150,15 @@
 
 	function barColor(s: Span): string {
 		const status = spanStatus(s);
-		if (status === 'failed') return 'bg-danger/80 border-danger';
-		if (status === 'running') return 'bg-warning/65 border-warning animate-pulse';
-		if (!s.kind) return 'bg-text-muted/30 border-text-muted/50';
+		if (status === 'failed') return 'bg-danger/75 border-danger/90';
+		if (status === 'running') return 'bg-warning/70 border-warning/90 animate-pulse';
+		if (!s.kind) return 'bg-text-muted/45 border-text-muted/70';
 		switch (s.kind.type) {
-			case 'llm_call': return 'bg-accent/70 border-accent';
-			case 'fs_read': return 'bg-emerald-500/55 border-emerald-500/80';
-			case 'fs_write': return 'bg-emerald-500/55 border-emerald-500/80';
-			case 'custom': return 'bg-text-muted/35 border-text-muted/50';
-			default: return 'bg-text-muted/35 border-text-muted/50';
+			case 'llm_call': return 'bg-accent/80 border-accent';
+			case 'fs_read': return 'bg-emerald-500/65 border-emerald-400';
+			case 'fs_write': return 'bg-teal-500/65 border-teal-300';
+			case 'custom': return 'bg-slate-500/60 border-slate-300/70';
+			default: return 'bg-text-muted/45 border-text-muted/70';
 		}
 	}
 
@@ -173,34 +188,92 @@
 		return null;
 	}
 
+	function providerBadge(s: Span): string | null {
+		if (s.kind?.type === 'llm_call') return s.kind.provider ?? null;
+		return null;
+	}
+
+	function modelBadge(s: Span): string | null {
+		if (s.kind?.type === 'llm_call') return s.kind.model;
+		return null;
+	}
+
+	function compactTokens(s: string | null): string | null {
+		if (!s) return null;
+		const n = Number(s.replace(/,/g, ''));
+		if (!Number.isFinite(n)) return s;
+		if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+		if (n >= 1_000) return `${(n / 1_000).toFixed(n >= 10_000 ? 0 : 1)}K`;
+		return `${n}`;
+	}
+
 	function statusDotClass(s: Span): string {
 		const st = spanStatus(s);
 		if (st === 'running') return 'bg-warning animate-pulse';
 		if (st === 'failed') return 'bg-danger';
 		return 'bg-success';
 	}
+
+	function showBarLabel(startPct: number, widthPct: number): boolean {
+		void startPct;
+		return widthPct * zoom > 10;
+	}
 </script>
 
-<div class="flex flex-col h-full min-h-0 bg-bg/10 text-[13px]">
+<div class="flex flex-col h-full min-h-0 bg-bg/10 text-[13px] min-w-0">
 	<!-- Toolbar -->
-	<div class="flex items-center gap-2 px-3 py-2.5 border-b border-border/70 shrink-0 bg-bg-secondary/45">
+	<div class="flex items-center gap-2 px-3 py-2.5 border-b border-border/70 shrink-0 bg-bg-secondary/45 flex-wrap min-w-0">
 		<span class="text-[12px] text-text-muted">{rows.length} spans</span>
+		<span class="text-[11px] text-text-muted/70">depth {maxDepth + 1}</span>
 		<div class="flex-1"></div>
-		<div class="flex items-center gap-0.5 text-[11px]">
+		<div class="flex items-center gap-0.5 text-[11px] shrink-0">
 			<button class="px-2 py-0.5 text-text-muted hover:text-text rounded hover:bg-bg-tertiary transition-colors" onclick={zoomOut}>-</button>
 			<button class="px-2 py-0.5 text-text-muted hover:text-text rounded hover:bg-bg-tertiary transition-colors text-[11px]" onclick={zoomReset}>{Math.round(zoom * 100)}%</button>
 			<button class="px-2 py-0.5 text-text-muted hover:text-text rounded hover:bg-bg-tertiary transition-colors" onclick={zoomIn}>+</button>
 		</div>
 	</div>
 
+	<!-- Control strip -->
+	<div class="flex items-center gap-2 px-3 py-2 border-b border-border/65 shrink-0 bg-bg-secondary/35 flex-wrap min-w-0">
+		<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-accent/35 bg-accent/10 text-accent text-[12px]">
+			<svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path d="M3 4h14v2H3V4Zm0 5h10v2H3V9Zm0 5h14v2H3v-2Z"/></svg>
+			Tree
+		</span>
+		<span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md border border-border/60 bg-bg-tertiary/35 text-[12px] text-text-muted">
+			Dense
+		</span>
+		<label class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md border border-border/60 bg-bg-tertiary/35 text-[12px] text-text-muted whitespace-nowrap">
+			<svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path d="M3 5h14v2H3V5Zm3 4h8v2H6V9Zm2 4h4v2H8v-2Z"/></svg>
+			Filters
+			<select bind:value={filterMode} class="bg-transparent text-text focus:outline-none">
+				<option value="all">all</option>
+				<option value="llm">llm</option>
+				<option value="file">file</option>
+				<option value="custom">custom</option>
+				<option value="failed">failed</option>
+			</select>
+		</label>
+		<div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-border/60 bg-bg-tertiary/35 text-[12px] text-text-muted min-w-0 max-w-[240px]">
+			<svg class="w-3.5 h-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path d="m14.32 13.26 3.2 3.2-1.06 1.06-3.2-3.2a7 7 0 1 1 1.06-1.06ZM8.5 14a5.5 5.5 0 1 0 0-11 5.5 5.5 0 0 0 0 11Z"/></svg>
+			<span class="truncate">{searchQuery.trim() ? `Search: ${searchQuery}` : 'Search'}</span>
+		</div>
+		<button
+			class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-[12px] transition-colors duration-150 {showMetadata ? 'border-accent/35 bg-accent/10 text-accent' : 'border-border/60 bg-bg-tertiary/35 text-text-muted hover:text-text'}"
+			onclick={() => showMetadata = !showMetadata}
+		>
+			<svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path d="M4 3h12a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Zm1 3v2h10V6H5Zm0 4v4h4v-4H5Zm6 0v1h4v-1h-4Zm0 3v1h4v-1h-4Z"/></svg>
+			Metadata
+		</button>
+	</div>
+
 	<!-- Time axis -->
-	<div class="flex shrink-0 border-b border-border/70 bg-bg-secondary/35" style="height: 30px">
+	<div class="flex shrink-0 border-b border-border/70 bg-bg-secondary/35" style="height: 32px">
 		<div class="shrink-0 sticky left-0 z-20 bg-bg-secondary/85 border-r border-border/60" style="width: {LABEL_WIDTH}px"></div>
 		<div class="flex-1 relative min-w-0 overflow-hidden">
 			<div class="relative h-full" style="width: {zoom * 100}%">
 				{#each ticks as tick}
-					<div class="absolute top-0 bottom-0 border-l border-border/40" style="left: {tick.pct}%">
-						<span class="absolute top-1 left-1 text-[11px] text-text-muted/80 whitespace-nowrap">{tick.label}</span>
+					<div class="absolute top-0 bottom-0 border-l border-border/50" style="left: {tick.pct}%">
+						<span class="absolute top-1 left-1 text-[11px] text-text-muted/85 whitespace-nowrap bg-bg/70 px-1 rounded">{tick.label}</span>
 					</div>
 				{/each}
 			</div>
@@ -225,22 +298,40 @@
 			{#each rows as row (row.span.id)}
 				{@const s = row.span}
 				{@const tokens = tokenCount(s)}
+				{@const compactTokenCount = compactTokens(tokens)}
 				{@const cost = costBadge(s)}
+				{@const model = modelBadge(s)}
+				{@const provider = providerBadge(s)}
 				<button
 					class="flex items-center w-full transition-colors group border-b border-border/25
-						{selectedId === s.id ? 'bg-accent/10' : 'hover:bg-bg-tertiary/35'}"
+						{selectedId === s.id ? 'bg-accent/10' : 'hover:bg-bg-tertiary/35 odd:bg-bg-secondary/10'}"
 					style="height: {ROW_HEIGHT}px"
 					onclick={() => onSelect?.(s)}
 				>
 					<!-- Label column -->
 					<div
 						class="shrink-0 sticky left-0 z-10 flex items-center gap-1.5 px-2 overflow-hidden border-r border-border/40
-							{selectedId === s.id ? 'bg-bg-secondary/95' : 'bg-bg/95 group-hover:bg-bg-secondary/88'}"
+							{selectedId === s.id ? 'bg-bg-secondary/96' : 'bg-bg/96 group-hover:bg-bg-secondary/90'}"
 						style="width: {LABEL_WIDTH}px; padding-left: {row.depth * INDENT_PX + 8}px"
 					>
 						<span class="w-1.5 h-1.5 rounded-full shrink-0 {statusDotClass(s)}"></span>
 						<div class="shrink-0 opacity-60"><SpanKindIcon span={s} /></div>
-						<span class="text-[13px] text-text truncate font-medium">{s.name}</span>
+						<span class="text-[12px] text-text truncate font-medium {showMetadata ? 'max-w-[32%]' : ''}">{s.name}</span>
+						{#if showMetadata}
+							<span class="shrink-0 text-[10px] text-text-secondary bg-bg-tertiary/60 border border-border/45 rounded px-1.5 py-px font-mono">{formatDuration(row.durationMs)}</span>
+							{#if model}
+								<span class="shrink-0 text-[10px] text-accent bg-accent/10 border border-accent/30 rounded px-1.5 py-px max-w-[24%] truncate">{model}</span>
+							{/if}
+							{#if provider}
+								<span class="shrink-0 text-[10px] text-text-muted bg-bg-tertiary/45 border border-border/45 rounded px-1.5 py-px">{provider}</span>
+							{/if}
+							{#if compactTokenCount}
+								<span class="shrink-0 text-[10px] text-text-muted bg-bg-tertiary/45 border border-border/45 rounded px-1.5 py-px">{compactTokenCount} tok</span>
+							{/if}
+							{#if cost}
+								<span class="shrink-0 text-[10px] text-success bg-success/10 border border-success/25 rounded px-1.5 py-px">{cost}</span>
+							{/if}
+						{/if}
 					</div>
 
 					<!-- Bar area -->
@@ -248,12 +339,12 @@
 						<div class="relative h-full" style="width: {zoom * 100}%">
 							<!-- Grid lines -->
 							{#each ticks as tick}
-								<div class="absolute top-0 bottom-0 border-l border-border/20" style="left: {tick.pct}%"></div>
+								<div class="absolute top-0 bottom-0 border-l border-border/28" style="left: {tick.pct}%"></div>
 							{/each}
 
 							<!-- Bar -->
 							<div
-								class="absolute top-1 bottom-1 rounded-sm border {barColor(s)} flex items-center overflow-hidden cursor-pointer
+								class="absolute top-1 bottom-1 rounded border {barColor(s)} flex items-center overflow-hidden cursor-pointer
 									{selectedId === s.id ? 'ring-1 ring-accent ring-offset-1 ring-offset-bg' : ''}"
 								style="left: {row.startPct}%; width: max({MIN_BAR_PX}px, {row.widthPct}%)"
 								role="button"
@@ -262,15 +353,11 @@
 								onmouseleave={hideTooltip}
 							>
 								<!-- Inline label (only when bar is wide enough) -->
-								<span class="text-[11px] text-text font-medium truncate px-1.5 whitespace-nowrap opacity-90">
-									{formatDuration(row.durationMs)}
-									{#if tokens}
-										<span class="text-text-muted/70 ml-1">{tokens}tok</span>
-									{/if}
-									{#if cost}
-										<span class="text-success/70 ml-1">{cost}</span>
-									{/if}
-								</span>
+								{#if showBarLabel(row.startPct, row.widthPct) || selectedId === s.id}
+									<span class="text-[10px] text-text font-medium truncate px-1.5 whitespace-nowrap opacity-95">
+										{s.name}
+									</span>
+								{/if}
 							</div>
 						</div>
 					</div>
@@ -291,7 +378,10 @@
 		<div class="flex items-center gap-2 text-text-muted">
 			<span>{kindLabel(s)}</span>
 			{#if s.kind?.type === 'llm_call'}
-				<span class="text-purple-400">{s.kind.model}</span>
+				<span class="text-accent">{s.kind.model}</span>
+				{#if s.kind.provider}
+					<span class="text-text-muted">{s.kind.provider}</span>
+				{/if}
 			{/if}
 		</div>
 		<div class="flex items-center gap-3">

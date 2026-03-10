@@ -46,13 +46,13 @@
 	{#if showBackdrop}
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<div
-			class="fixed inset-0 z-[120] bg-black/25"
+			class="fixed inset-0 z-[120] bg-black/25 motion-fade-in"
 			onclick={close}
 			onkeydown={(e) => e.key === 'Escape' && close()}
 		></div>
 	{/if}
 
-	<aside class="fixed right-3 top-[5.2rem] bottom-16 z-[130] {widthClass} pointer-events-auto">
+	<aside class="fixed right-3 top-[5.2rem] bottom-16 z-[130] {widthClass} pointer-events-auto motion-slide-in-right">
 		<div class="h-full surface-panel overflow-hidden flex flex-col">
 			<div class="px-3.5 py-2.5 border-b border-border/60 flex items-center gap-2">
 				<div class="min-w-0 flex-1">

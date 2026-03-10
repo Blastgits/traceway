@@ -18,6 +18,16 @@ export type SpanList = Schemas['SpanList'];
 export type Stats = Schemas['Stats'];
 export type ExportData = Schemas['ExportData'];
 
+export interface SessionSummary {
+	id: string;
+	trace_count: number;
+	span_count: number;
+	total_tokens: number;
+	total_cost: number;
+	started_at: string;
+	ended_at?: string | null;
+}
+
 // File types
 export type FileVersion = Schemas['FileVersion'];
 export type FileListResponse = Schemas['FileListResponse'];
@@ -331,7 +341,9 @@ async function postRaw(path: string, body?: unknown): Promise<Response> {
 
 // ─── Trace / Span Endpoints ─────────────────────────────────────────
 
-export const getTraces = () => get<Page<Trace>>('/traces');
+export const getTraces = (params?: { cursor?: string; limit?: number }) =>
+	get<Page<Trace>>(`/traces${qs({ cursor: params?.cursor, limit: params?.limit != null ? String(params.limit) : undefined })}`);
+export const getSessions = () => get<Page<SessionSummary>>('/sessions');
 export const createTrace = (name?: string, tags?: string[]) =>
 	post<Trace>('/traces', { name, tags: tags ?? [] });
 export const getTrace = (id: string) => get<SpanList>(`/traces/${id}`);
@@ -398,6 +410,8 @@ export const deleteDataset = (id: string) => del<unknown>(`/datasets/${id}`);
 
 export const getDatapoints = (datasetId: string) =>
 	get<Page<Datapoint>>(`/datasets/${datasetId}/datapoints`);
+export const getDatapoint = (datasetId: string, datapointId: string) =>
+	get<Datapoint>(`/datasets/${datasetId}/datapoints/${datapointId}`);
 export const createDatapoint = (datasetId: string, kind: DatapointKind) =>
 	post<Datapoint>(`/datasets/${datasetId}/datapoints`, { kind });
 export const deleteDatapoint = (datasetId: string, dpId: string) =>
@@ -414,8 +428,8 @@ export function importFile(datasetId: string, file: File): Promise<{ imported: n
 
 export const getQueue = (datasetId: string) =>
 	get<Page<QueueItem>>(`/datasets/${datasetId}/queue`);
-export const getAllQueueItems = (status?: string) =>
-	get<Page<QueueItem>>(`/queue${status ? `?status=${status}` : ''}`);
+export const getAllQueueItems = (status?: string, datasetId?: string) =>
+	get<Page<QueueItem>>(`/queue${qs({ status, dataset_id: datasetId })}`);
 export const enqueueDatapoints = (datasetId: string, datapointIds: string[]) =>
 	post<unknown>(`/datasets/${datasetId}/queue`, { datapoint_ids: datapointIds });
 export const claimQueueItem = (itemId: string, claimedBy: string) =>
