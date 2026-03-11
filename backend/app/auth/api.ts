@@ -25,6 +25,13 @@ import {
   signup,
   switchProject,
 } from "./service";
+import {
+  clearFailedLogins,
+  isLoginRateLimited,
+  isPasswordResetRateLimited,
+  recordFailedLogin,
+  recordPasswordResetAttempt,
+} from "./rate_limit";
 
 function currentSessionToken(req: import("http").IncomingMessage): string | undefined {
   return parseCookie(req.headers.cookie, "session");
@@ -32,6 +39,20 @@ function currentSessionToken(req: import("http").IncomingMessage): string | unde
 
 function pathSegments(req: import("http").IncomingMessage): string[] {
   return new URL(req.url ?? "/", "http://local").pathname.split("/").filter(Boolean);
+}
+
+function requestIp(req: import("http").IncomingMessage): string {
+  const forwarded = req.headers["x-forwarded-for"];
+  const firstForwarded = Array.isArray(forwarded) ? forwarded[0] : forwarded;
+  const ip = firstForwarded?.split(",")[0]?.trim();
+  if (ip) return ip;
+
+  const realIp = req.headers["x-real-ip"];
+  if (typeof realIp === "string" && realIp.trim()) {
+    return realIp.trim();
+  }
+
+  return req.socket.remoteAddress ?? "unknown";
 }
 
 export const authConfig = api.raw(
@@ -89,13 +110,25 @@ export const authLogin = api.raw(
   async (req, res) => {
     if (handlePreflight(req, res)) return;
     setCors(req, res);
+    let emailForRateLimit: string | undefined;
+    const ip = requestIp(req);
     try {
       const body = await readJsonBody<{ email?: string; password?: string }>(req);
       if (!body.email || !body.password) {
         json(res, 400, { error: "email and password are required" });
         return;
       }
+
+      emailForRateLimit = body.email;
+
+      const blocked = await isLoginRateLimited(body.email, ip);
+      if (blocked) {
+        json(res, 429, { error: "Too many failed login attempts. Try again in a few minutes." });
+        return;
+      }
+
       const { user, token } = await login({ email: body.email, password: body.password });
+      await clearFailedLogins(body.email);
       res.setHeader("set-cookie", sessionCookie(token));
       json(res, 200, {
         user_id: user.id,
@@ -106,6 +139,9 @@ export const authLogin = api.raw(
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Login failed";
+      if (msg.includes("Invalid") && emailForRateLimit) {
+        await recordFailedLogin(emailForRateLimit, ip);
+      }
       json(res, msg.includes("Invalid") ? 401 : 500, { error: msg });
     }
   }
@@ -360,6 +396,15 @@ export const forgotPasswordEndpoint = api.raw(
       json(res, 400, { ok: false, message: "email is required" });
       return;
     }
+
+    const ip = requestIp(req);
+    const blocked = await isPasswordResetRateLimited(body.email, ip);
+    if (blocked) {
+      json(res, 429, { ok: false, message: "Too many reset attempts. Try again in a few minutes." });
+      return;
+    }
+
+    await recordPasswordResetAttempt(body.email, ip);
     await issuePasswordReset(body.email);
     json(res, 200, { ok: true, message: "If account exists, reset was issued" });
   }
