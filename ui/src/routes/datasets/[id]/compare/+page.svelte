@@ -131,6 +131,12 @@
 		// We don't have token data in comparison cells, so skip
 		return '\u2014';
 	}
+
+	function formatDelta(delta: number): string {
+		if (delta === 0) return '0';
+		const sign = delta > 0 ? '+' : '';
+		return `${sign}${delta.toFixed(2)}`;
+	}
 </script>
 
 <div class="app-shell-wide space-y-4">
@@ -183,6 +189,24 @@
 			{/each}
 		</div>
 
+		<!-- Summary stats bar -->
+		{@const improved = filterCounts.improvements}
+		{@const regressed = filterCounts.regressions}
+		{@const unchanged = filterCounts.all - improved - regressed}
+		{@const total = filterCounts.all}
+		<div class="bg-bg-secondary border border-border rounded-md p-3 space-y-2">
+			<div class="flex items-center justify-between text-xs">
+				<span class="text-success">{improved} improved ({total > 0 ? Math.round(improved / total * 100) : 0}%)</span>
+				<span class="text-text-muted">{unchanged} unchanged ({total > 0 ? Math.round(unchanged / total * 100) : 0}%)</span>
+				<span class="text-danger">{regressed} regressed ({total > 0 ? Math.round(regressed / total * 100) : 0}%)</span>
+			</div>
+			<div class="flex h-2 rounded-full overflow-hidden">
+				<div class="bg-success" style="width: {total > 0 ? (improved / total * 100) : 0}%"></div>
+				<div class="bg-bg-tertiary" style="width: {total > 0 ? (unchanged / total * 100) : 100}%"></div>
+				<div class="bg-danger" style="width: {total > 0 ? (regressed / total * 100) : 0}%"></div>
+			</div>
+		</div>
+
 		<!-- Filter pills -->
 		<div class="app-toolbar-shell rounded-xl p-2 flex items-center gap-1.5 flex-wrap">
 			<button
@@ -231,6 +255,10 @@
 								<!-- Run result cells -->
 								{#each comparison.runs as run, i (run.id)}
 									{@const cell = dp.results[run.id]}
+									{@const firstRunId = comparison.runs[0].id}
+									{@const isFirstRun = run.id === firstRunId}
+									{@const firstCell = dp.results[firstRunId]}
+									{@const scoreDelta = !isFirstRun && cell && firstCell ? (cell.score ?? 0) - (firstCell.score ?? 0) : 0}
 									{#if cell}
 										<div
 											class="text-xs p-1.5 rounded {runBgColors[i % runBgColors.length]} cursor-pointer"
@@ -254,14 +282,80 @@
 													<span class="text-warning">!</span>
 												{/if}
 												<EvalScoreBadge score={cell.score} size="xs" />
+												{#if !isFirstRun && scoreDelta !== 0}
+													<span class="text-xs font-mono {scoreDelta > 0 ? 'text-success bg-success/10 border border-success/20' : 'text-danger bg-danger/10 border border-danger/20'} rounded px-1 py-0.5">
+														{formatDelta(scoreDelta)}
+													</span>
+												{/if}
 												<span class="text-text-muted ml-auto">{formatLatency(cell.latency_ms)}</span>
 											</div>
-											<div class="text-text-secondary font-mono truncate">{truncate(formatOutput(cell.output), 80)}</div>
+
+											<!-- Diff highlighting for output differences -->
+											{#if !isFirstRun && firstCell && formatOutput(cell.output) !== formatOutput(firstCell.output)}
+												<div class="text-text-secondary font-mono truncate border-l-2 {scoreDelta > 0 ? 'border-success/50' : scoreDelta < 0 ? 'border-danger/50' : 'border-border'} pl-1.5">
+													{truncate(formatOutput(cell.output), 80)}
+												</div>
+											{:else}
+												<div class="text-text-secondary font-mono truncate">{truncate(formatOutput(cell.output), 80)}</div>
+											{/if}
 
 											{#if expandedCell === `${dp.datapoint_id}-${run.id}`}
-												<div class="mt-2 p-2 bg-bg-tertiary rounded">
-													<div class="text-text-muted uppercase mb-1">Full Output</div>
-													<pre class="whitespace-pre-wrap text-text-secondary max-h-48 overflow-auto">{formatOutput(cell.output)}</pre>
+												<div class="mt-2 space-y-2 motion-rise-in">
+													<!-- Full Output -->
+													<div class="p-2 bg-bg-tertiary rounded-md border border-border">
+														<div class="text-text-muted uppercase text-[10px] tracking-wider mb-1">Full Output</div>
+														<pre class="whitespace-pre-wrap text-text-secondary max-h-48 overflow-auto text-xs">{formatOutput(cell.output)}</pre>
+													</div>
+
+													<!-- Expected output -->
+													{#if dp.expected != null}
+														<div class="p-2 bg-bg-tertiary rounded-md border border-border">
+															<div class="text-text-muted uppercase text-[10px] tracking-wider mb-1">Expected</div>
+															<pre class="whitespace-pre-wrap text-text-secondary max-h-48 overflow-auto text-xs">{formatOutput(dp.expected)}</pre>
+														</div>
+													{/if}
+
+													<!-- Score reason -->
+													{#if cell.status === 'failed' || cell.status === 'error'}
+														<div class="p-2 bg-danger/5 rounded-md border border-danger/20">
+															<div class="text-danger uppercase text-[10px] tracking-wider mb-1">Status</div>
+															<span class="text-xs text-danger/80">{cell.status}</span>
+														</div>
+													{/if}
+
+													<!-- Side-by-side comparison with first run -->
+													{#if !isFirstRun && firstCell}
+														<div class="p-2 bg-bg-tertiary rounded-md border border-border">
+															<div class="text-text-muted uppercase text-[10px] tracking-wider mb-2">Comparison with {comparison.runs[0].name ?? comparison.runs[0].config.model}</div>
+															<div class="grid grid-cols-2 gap-2">
+																<div>
+																	<div class="text-[10px] text-text-muted mb-0.5 uppercase">{comparison.runs[0].name ?? comparison.runs[0].config.model}</div>
+																	<div class="p-1.5 rounded text-xs font-mono {(cell.score ?? 0) > (firstCell.score ?? 0) ? 'bg-danger/10 border border-danger/20' : (cell.score ?? 0) < (firstCell.score ?? 0) ? 'bg-success/10 border border-success/20' : 'bg-bg-secondary border border-border'}">
+																		<div class="flex items-center gap-1 mb-1">
+																			<EvalScoreBadge score={firstCell.score} size="xs" />
+																			<span class="text-text-muted">{formatLatency(firstCell.latency_ms)}</span>
+																		</div>
+																		<pre class="whitespace-pre-wrap text-text-secondary max-h-32 overflow-auto">{truncate(formatOutput(firstCell.output), 300)}</pre>
+																	</div>
+																</div>
+																<div>
+																	<div class="text-[10px] text-text-muted mb-0.5 uppercase">{run.name ?? run.config.model}</div>
+																	<div class="p-1.5 rounded text-xs font-mono {(cell.score ?? 0) > (firstCell.score ?? 0) ? 'bg-success/10 border border-success/20' : (cell.score ?? 0) < (firstCell.score ?? 0) ? 'bg-danger/10 border border-danger/20' : 'bg-bg-secondary border border-border'}">
+																		<div class="flex items-center gap-1 mb-1">
+																			<EvalScoreBadge score={cell.score} size="xs" />
+																			<span class="text-text-muted">{formatLatency(cell.latency_ms)}</span>
+																		</div>
+																		<pre class="whitespace-pre-wrap text-text-secondary max-h-32 overflow-auto">{truncate(formatOutput(cell.output), 300)}</pre>
+																	</div>
+																</div>
+															</div>
+															{#if scoreDelta !== 0}
+																<div class="mt-2 text-center text-xs {scoreDelta > 0 ? 'text-success' : 'text-danger'}">
+																	Score delta: {formatDelta(scoreDelta)}
+																</div>
+															{/if}
+														</div>
+													{/if}
 												</div>
 											{/if}
 										</div>
