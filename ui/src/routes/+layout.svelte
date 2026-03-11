@@ -65,6 +65,61 @@
 		}
 	}
 
+	function runGlobalQuery() {
+		const q = globalQueryText.trim();
+		if (page.url.pathname.startsWith('/datasets')) {
+			if (q) {
+				goto(`/datasets?q=${encodeURIComponent(q)}`);
+			} else {
+				goto('/datasets');
+			}
+			return;
+		}
+		if (q) {
+			goto(`/query?q=${encodeURIComponent(q)}`);
+		} else {
+			goto('/query');
+		}
+	}
+
+	function isSectionActive(href: string): boolean {
+		if (href === '/traces') return page.url.pathname === '/traces' || page.url.pathname.startsWith('/traces/') || page.url.pathname === '/spans';
+		if (href === '/settings') return page.url.pathname === '/settings' || page.url.pathname.startsWith('/settings/');
+		if (href === '/datasets') return page.url.pathname === '/datasets' || page.url.pathname.startsWith('/datasets/');
+		if (href === '/approvals') return page.url.pathname === '/approvals';
+		if (href === '/analytics') return page.url.pathname === '/analytics' || page.url.pathname.startsWith('/analytics/');
+		if (href === '/query') return page.url.pathname === '/query';
+		return page.url.pathname === href;
+	}
+
+	const topNavTabs = [
+		{ href: '/', label: 'Home' },
+		{ href: '/traces', label: 'Traces' },
+		{ href: '/review', label: 'Review' },
+		{ href: '/approvals', label: 'Approvals' },
+		{ href: '/analytics', label: 'Analytics' },
+		{ href: '/query', label: 'Search' },
+		{ href: '/datasets', label: 'Datasets' },
+		{ href: '/settings', label: 'Settings' }
+	] as const;
+
+	const workspaceLabel = $derived.by(() => currentProject?.name || 'default');
+
+	const commandPlaceholder = $derived.by(() => {
+		if (page.url.pathname.startsWith('/traces/')) return 'Search this trace context... status:failed model:gpt-4o';
+		if (page.url.pathname.startsWith('/datasets')) return 'Search datasets... name:eval description:qa';
+		if (page.url.pathname.startsWith('/settings')) return 'Jump into query... status:failed provider:openai';
+		return 'Search traces... model:gpt-4o status:failed';
+	});
+
+	const commandActionLabel = $derived.by(() => (page.url.pathname.startsWith('/datasets') ? 'Search' : 'Query'));
+
+	const railWidthClass = $derived.by(() =>
+		page.url.pathname.startsWith('/traces/') ? 'w-[min(1120px,calc(100vw-1.25rem))]' : 'w-[min(980px,calc(100vw-1.25rem))]'
+	);
+
+	const themeLabel = $derived.by(() => (theme === 'system' ? 'Auto' : theme === 'light' ? 'Light' : 'Dark'));
+
 	// Auth pages don't need sidebar or auth check
 	const authPages = ['/login', '/signup', '/accept-invite', '/forgot-password', '/reset-password'];
 	const isAuthPage = $derived(authPages.includes(page.url.pathname));
