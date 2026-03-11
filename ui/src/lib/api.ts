@@ -416,6 +416,8 @@ export const createDatapoint = (datasetId: string, kind: DatapointKind) =>
 	post<Datapoint>(`/datasets/${datasetId}/datapoints`, { kind });
 export const deleteDatapoint = (datasetId: string, dpId: string) =>
 	del<unknown>(`/datasets/${datasetId}/datapoints/${dpId}`);
+export const updateDatapoint = (datasetId: string, dpId: string, kind: DatapointKind) =>
+	post<Datapoint>(`/datasets/${datasetId}/datapoints/${dpId}`, { kind });
 
 export const exportSpanToDataset = (datasetId: string, spanId: string) =>
 	post<Datapoint>(`/datasets/${datasetId}/export-span`, { span_id: spanId });
