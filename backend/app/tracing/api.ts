@@ -182,8 +182,8 @@ export const completeSpanEndpoint = api.raw(
     if (!session) return;
     setCors(req, res);
     const spanId = pathSegments(req)[1] ?? "";
-    const body = await readJsonBody<{ output?: unknown }>(req);
-    await completeSpan(session, spanId, body.output);
+    const body = await readJsonBody<{ output?: unknown; kind?: Record<string, unknown> }>(req);
+    await completeSpan(session, spanId, body.output, body.kind);
     json(res, 200, { ok: true });
   }
 );

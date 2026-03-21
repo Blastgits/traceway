@@ -316,14 +316,20 @@ export async function createSpan(
   return { id: row.id, trace_id: row.traceId };
 }
 
-export async function completeSpan(scope: Scope, spanId: string, output?: unknown): Promise<void> {
+export async function completeSpan(scope: Scope, spanId: string, output?: unknown, updatedKind?: Record<string, unknown>): Promise<void> {
+  // If the caller provides an updated kind (e.g. with token counts), enrich it with cost
+  const setFields: Record<string, unknown> = {
+    status: "completed",
+    endedAt: new Date(),
+    output: output ?? null,
+  };
+  if (updatedKind && typeof updatedKind === "object" && updatedKind.type) {
+    setFields.kind = enrichKindWithCost(updatedKind);
+  }
+
   const [row] = await db
     .update(spans)
-    .set({
-      status: "completed",
-      endedAt: new Date(),
-      output: output ?? null,
-    })
+    .set(setFields)
     .where(and(eq(spans.id, spanId), eq(spans.orgId, scope.org_id), eq(spans.projectId, scope.project_id)))
     .returning();
 

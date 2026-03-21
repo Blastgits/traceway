@@ -15,7 +15,12 @@ export const auth = authHandler<AuthParams, AuthData>(async (params) => {
   const expected =
     process.env.TRACEWAY_BACKEND_TOKEN ?? process.env.TRACEWAY_CONTROL_PLANE_TOKEN ?? "";
 
-  if (!expected) {
+  // Local dev mode: allow unauthenticated requests
+  const isLocalDev = process.env.TRACEWAY_LOCAL_DEV?.trim() === "true";
+  if (!expected || isLocalDev) {
+    if (params.serviceToken && expected && params.serviceToken === expected) {
+      return { userID: "traceway-daemon", principal: "traceway-daemon" };
+    }
     return { userID: "local-dev", principal: "dev" };
   }
 

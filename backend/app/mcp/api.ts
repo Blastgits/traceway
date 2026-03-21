@@ -2,11 +2,11 @@ import { IncomingMessage, ServerResponse } from "node:http";
 
 import { api } from "encore.dev/api";
 
-import { defaultScopeForLocal } from "../auth/service";
+import { auth, datasets, tracing } from "~encore/clients";
+
 import { JsonValue } from "../core/json";
-import { DatasetsService } from "../datasets/service";
 import { handlePreflight, json, readJsonBody, requireScope, setCors } from "../shared/http";
-import { addTraceTags, getSpan, getTraceSpans, listSessions, listSpans, listTraces, type SpanItem, type TraceItem } from "../tracing/service";
+import type { SpanItem, TraceItem } from "../tracing/service";
 
 type Scope = { org_id: string; project_id: string };
 
@@ -176,7 +176,7 @@ async function resolveMcpScope(req: IncomingMessage, res: ServerResponse): Promi
     return null;
   }
 
-  const fallback = await defaultScopeForLocal();
+  const { scope: fallback } = await auth.getDefaultScopeRpc();
   if (!fallback) {
     json(res, 401, { error: "No local scope available" });
     return null;
@@ -359,8 +359,8 @@ function buildTraceText(summary: TraceSummary, spansForTrace: SpanItem[]): strin
 }
 
 async function toolListRecent(scope: Scope, args: Record<string, unknown>) {
-  const traces = await listTraces(scope);
-  const spans = await listSpans(scope);
+  const traces = (await tracing.listTracesRpc(scope)).traces;
+  const spans = (await tracing.listSpansRpc(scope)).spans;
   const byTrace = new Map<string, SpanItem[]>();
   for (const s of spans) {
     const arr = byTrace.get(s.trace_id) ?? [];
@@ -380,8 +380,8 @@ async function toolSearchTraces(scope: Scope, args: Record<string, unknown>) {
   const query = typeof args.query === "string" ? args.query.trim() : "";
   if (!query) throw new Error("query is required");
 
-  const traces = await listTraces(scope);
-  const spans = await listSpans(scope);
+  const traces = (await tracing.listTracesRpc(scope)).traces;
+  const spans = (await tracing.listSpansRpc(scope)).spans;
   const byTrace = new Map<string, SpanItem[]>();
   for (const s of spans) {
     const arr = byTrace.get(s.trace_id) ?? [];
@@ -442,10 +442,10 @@ async function toolSearchTraces(scope: Scope, args: Record<string, unknown>) {
 async function toolGetTrace(scope: Scope, args: Record<string, unknown>) {
   const traceId = typeof args.trace_id === "string" ? args.trace_id : "";
   if (!traceId) throw new Error("trace_id is required");
-  const traces = await listTraces(scope);
+  const traces = (await tracing.listTracesRpc(scope)).traces;
   const trace = traces.find((t) => t.id === traceId);
   if (!trace) throw new Error("trace not found");
-  const spansForTrace = await getTraceSpans(scope, traceId);
+  const spansForTrace = (await tracing.getTraceSpansRpc({ ...scope, trace_id: traceId })).spans;
   const summary = summarizeTrace(trace, spansForTrace);
   const text = buildTraceText(summary, spansForTrace);
   return {
@@ -457,7 +457,7 @@ async function toolGetTrace(scope: Scope, args: Record<string, unknown>) {
 async function toolGetSpan(scope: Scope, args: Record<string, unknown>) {
   const spanId = typeof args.span_id === "string" ? args.span_id : "";
   if (!spanId) throw new Error("span_id is required");
-  const span = await getSpan(scope, spanId);
+  const { span } = await tracing.getSpanRpc({ ...scope, span_id: spanId });
   if (!span) throw new Error("span not found");
   const text = [
     `Span ${span.id}`,
@@ -486,7 +486,7 @@ async function toolTagTrace(scope: Scope, args: Record<string, unknown>) {
   if (!traceId) throw new Error("trace_id is required");
   if (tags.length === 0) throw new Error("tags must contain at least one string");
 
-  const updated = await addTraceTags(scope, traceId, tags);
+  const { trace: updated } = await tracing.addTraceTagsRpc({ ...scope, trace_id: traceId, tags });
   if (!updated) throw new Error("trace not found or no tags provided");
 
   return {
@@ -533,8 +533,8 @@ async function toolGetSessionTraces(scope: Scope, args: Record<string, unknown>)
   const sessionId = typeof args.session_id === "string" ? args.session_id : "";
   if (!sessionId) throw new Error("session_id is required");
 
-  const traces = await listTraces(scope);
-  const spans = await listSpans(scope);
+  const traces = (await tracing.listTracesRpc(scope)).traces;
+  const spans = (await tracing.listSpansRpc(scope)).spans;
   
   const sessionTraces = traces.filter(t => {
     const tags = t.tags ?? [];
@@ -573,8 +573,8 @@ async function toolGetSessionTraces(scope: Scope, args: Record<string, unknown>)
 }
 
 async function toolListSessions(scope: Scope, args: Record<string, unknown>) {
-  const traces = await listTraces(scope);
-  const spans = await listSpans(scope);
+  const traces = (await tracing.listTracesRpc(scope)).traces;
+  const spans = (await tracing.listSpansRpc(scope)).spans;
   
   const sessionMap = new Map<string, { trace_count: number; span_count: number; total_tokens: number; total_cost: number; started_at: string; ended_at?: string | null }>();
   
@@ -650,8 +650,8 @@ async function toolSearchMemory(scope: Scope, args: Record<string, unknown>) {
   const limitRaw = typeof args.limit === "number" ? args.limit : 10;
   const limit = Math.max(1, Math.min(50, Math.floor(limitRaw)));
 
-  const spans = await listSpans(scope);
-  const traces = await listTraces(scope);
+  const spans = (await tracing.listSpansRpc(scope)).spans;
+  const traces = (await tracing.listTracesRpc(scope)).traces;
   const traceMap = new Map(traces.map(t => [t.id, t]));
 
   const results: { span: SpanItem; trace: TraceItem | undefined; relevance: string }[] = [];
