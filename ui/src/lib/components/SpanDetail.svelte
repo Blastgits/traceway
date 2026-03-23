@@ -460,24 +460,32 @@
 						{/if}
 					</div>
 				{:else}
-					<!-- Pretty messages: collapsible role sections (Laminar-style) -->
+					<!-- Pretty messages: Laminar-style bordered cards -->
 					{#if formatMode === 'pretty' && (inputMessages || outputMessages)}
-						<div class="divide-y divide-border/30">
+						<!-- MESSAGES header -->
+						<div class="px-3 pt-3 pb-1.5">
+							<span class="text-[10px] uppercase tracking-[0.1em] text-text-muted font-medium bg-bg-tertiary border border-border/50 rounded px-2 py-0.5">Messages</span>
+						</div>
+
+						<div class="px-3 pb-3 space-y-2">
 							{#if inputMessages}
 								{#each inputMessages as msg, idx}
 									{@const key = `in-${msg.role}-${idx}`}
-									<div>
+									<div class="rounded-lg border border-border/50 bg-bg-tertiary/40 overflow-hidden">
+										<!-- Role header -->
 										<!-- svelte-ignore a11y_no_static_element_interactions -->
-										<div class="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-bg-secondary/20 transition-colors" onclick={() => { if (collapsedSections.has(key)) collapsedSections.delete(key); else collapsedSections.add(key); collapsedSections = new Set(collapsedSections); }}>
-											<svg class="w-2.5 h-2.5 text-text-muted/50 transition-transform {collapsedSections.has(key) ? '-rotate-90' : ''}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg>
-											<span class="text-[11px] font-semibold uppercase tracking-wide {roleColor(msg.role)}">{msg.role}</span>
+										<div class="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-bg-tertiary/60 transition-colors" onclick={() => { if (collapsedSections.has(key)) collapsedSections.delete(key); else collapsedSections.add(key); collapsedSections = new Set(collapsedSections); }}>
+											<span class="text-[13px] font-bold uppercase {roleColor(msg.role)}">{msg.role}</span>
 											<div class="flex-1"></div>
-											<button class="w-5 h-5 rounded flex items-center justify-center text-text-muted/30 hover:text-text-muted transition-colors" onclick={(e) => { e.stopPropagation(); copyText(msg.content); }} aria-label="Copy">
-												<svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.666 3.888A2.25 2.25 0 0 0 13.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 0 1-.75.75H9.75a.75.75 0 0 1-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 0 1-2.25 2.25H6.75A2.25 2.25 0 0 1 4.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 0 1 1.927-.184" /></svg>
-											</button>
+											<svg class="w-3.5 h-3.5 text-text-muted/40 transition-transform {collapsedSections.has(key) ? '-rotate-90' : ''}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg>
 										</div>
 										{#if !collapsedSections.has(key)}
-											<div class="px-3 pb-3 text-[12px] text-text whitespace-pre-wrap break-words leading-relaxed">{typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content, null, 2)}</div>
+											<!-- JSON badge -->
+											<div class="px-3 pb-1">
+												<span class="text-[9px] text-text-muted bg-bg-tertiary border border-border/40 rounded px-1.5 py-0.5 font-mono">JSON</span>
+											</div>
+											<!-- Content -->
+											<div class="px-3 pb-3 text-[12px] text-text font-mono whitespace-pre-wrap break-words leading-relaxed">{typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content, null, 2)}</div>
 										{/if}
 									</div>
 								{/each}
@@ -485,18 +493,19 @@
 							{#if outputMessages}
 								{#each outputMessages as msg, idx}
 									{@const key = `out-${msg.role}-${idx}`}
-									<div>
+									<div class="rounded-lg border border-border/50 bg-bg-tertiary/40 overflow-hidden">
+										<!-- Role header -->
 										<!-- svelte-ignore a11y_no_static_element_interactions -->
-										<div class="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-bg-secondary/20 transition-colors" onclick={() => { if (collapsedSections.has(key)) collapsedSections.delete(key); else collapsedSections.add(key); collapsedSections = new Set(collapsedSections); }}>
-											<svg class="w-2.5 h-2.5 text-text-muted/50 transition-transform {collapsedSections.has(key) ? '-rotate-90' : ''}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg>
-											<span class="text-[11px] font-semibold uppercase tracking-wide {roleColor(msg.role)}">{msg.role}</span>
+										<div class="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-bg-tertiary/60 transition-colors" onclick={() => { if (collapsedSections.has(key)) collapsedSections.delete(key); else collapsedSections.add(key); collapsedSections = new Set(collapsedSections); }}>
+											<span class="text-[13px] font-bold uppercase {roleColor(msg.role)}">{msg.role}</span>
 											<div class="flex-1"></div>
-											<button class="w-5 h-5 rounded flex items-center justify-center text-text-muted/30 hover:text-text-muted transition-colors" onclick={(e) => { e.stopPropagation(); copyText(msg.content); }} aria-label="Copy">
-												<svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.666 3.888A2.25 2.25 0 0 0 13.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 0 1-.75.75H9.75a.75.75 0 0 1-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 0 1-2.25 2.25H6.75A2.25 2.25 0 0 1 4.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 0 1 1.927-.184" /></svg>
-											</button>
+											<svg class="w-3.5 h-3.5 text-text-muted/40 transition-transform {collapsedSections.has(key) ? '-rotate-90' : ''}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg>
 										</div>
 										{#if !collapsedSections.has(key)}
-											<div class="px-3 pb-3 text-[12px] text-text whitespace-pre-wrap break-words leading-relaxed">{typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content, null, 2)}</div>
+											<div class="px-3 pb-1">
+												<span class="text-[9px] text-text-muted bg-bg-tertiary border border-border/40 rounded px-1.5 py-0.5 font-mono">JSON</span>
+											</div>
+											<div class="px-3 pb-3 text-[12px] text-text font-mono whitespace-pre-wrap break-words leading-relaxed">{typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content, null, 2)}</div>
 										{/if}
 									</div>
 								{/each}
