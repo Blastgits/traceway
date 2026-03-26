@@ -65,23 +65,6 @@
 		}
 	}
 
-	function runGlobalQuery() {
-		const q = globalQueryText.trim();
-		if (page.url.pathname.startsWith('/datasets')) {
-			if (q) {
-				goto(`/datasets?q=${encodeURIComponent(q)}`);
-			} else {
-				goto('/datasets');
-			}
-			return;
-		}
-		if (q) {
-			goto(`/query?q=${encodeURIComponent(q)}`);
-		} else {
-			goto('/query');
-		}
-	}
-
 	function isSectionActive(href: string): boolean {
 		if (href === '/traces') return page.url.pathname === '/traces' || page.url.pathname.startsWith('/traces/') || page.url.pathname === '/spans';
 		if (href === '/settings') return page.url.pathname === '/settings' || page.url.pathname.startsWith('/settings/');

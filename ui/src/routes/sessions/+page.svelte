@@ -12,6 +12,14 @@
 	let selectedSession: SessionSummary | null = $state(null);
 	let selectedTraceId: string | null = $state(null);
 	let selectedSpan: Span | null = $state(null);
+	const sessionsDocsHref = 'https://docs.traceway.ai/platform/sessions';
+	const sessionSnippet = `from traceway import TracewayClient
+
+client = TracewayClient()
+client.create_trace(
+    name="checkout-flow",
+    tags=["session_id:checkout-42"]
+)`;
 
 	const sessionTraces = $derived.by(() => {
 		if (!selectedSession) return [];
@@ -120,14 +128,29 @@
 			{#if loading}
 				<div class="p-4 text-center text-sm text-text-muted">Loading sessions...</div>
 			{:else if filtered.length === 0}
-				<div class="p-4 text-center text-sm text-text-muted">
-					{#if q}
-						No sessions match "{q}"
-					{:else}
-						No sessions found.<br/>
-						<span class="text-[11px]">Add tag <span class="font-mono">session_id:xxx</span> to traces</span>
-					{/if}
-				</div>
+				{#if q}
+					<div class="p-4 text-center text-sm text-text-muted">No sessions match "{q}"</div>
+				{:else}
+					<div class="p-4">
+						<div class="table-float p-5 text-center space-y-3 border border-border/55">
+							<div class="mx-auto flex h-10 w-10 items-center justify-center rounded-full border border-accent/25 bg-accent/10 text-accent">
+								<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+									<path stroke-linecap="round" stroke-linejoin="round" d="M7.5 6h9m-9 6h9m-9 6h5.25M3.75 5.25A2.25 2.25 0 0 1 6 3h12a2.25 2.25 0 0 1 2.25 2.25v13.5A2.25 2.25 0 0 1 18 21H6a2.25 2.25 0 0 1-2.25-2.25V5.25Z" />
+								</svg>
+							</div>
+							<div class="space-y-1">
+								<div class="text-sm font-medium text-text">No sessions yet</div>
+								<div class="text-[11px] text-text-muted">
+									Sessions appear when traces include a <span class="font-mono">session_id:...</span> tag.
+								</div>
+							</div>
+							<div class="flex flex-wrap items-center justify-center gap-2">
+								<a href="/traces" class="btn-primary">Open traces</a>
+								<a href={sessionsDocsHref} target="_blank" rel="noopener" class="btn-secondary">Session docs</a>
+							</div>
+						</div>
+					</div>
+				{/if}
 			{:else}
 				{#each filtered as session (session.id)}
 					<button
@@ -242,10 +265,32 @@
 		</div>
 	{:else}
 		<!-- Empty state -->
-		<div class="flex-1 flex items-center justify-center">
-			<div class="text-center">
-				<div class="text-text-muted text-sm mb-2">Select a session to view its traces</div>
-				<div class="text-[11px] text-text-muted">Sessions are created by tagging traces with <span class="font-mono">session_id:xxx</span></div>
+		<div class="flex-1 flex items-center justify-center p-8">
+			<div class="max-w-xl w-full">
+				<div class="table-float p-6 text-center space-y-4 border border-border/55">
+					<div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-accent/25 bg-accent/10 text-accent">
+						<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M7.5 6h9m-9 6h9m-9 6h5.25M3.75 5.25A2.25 2.25 0 0 1 6 3h12a2.25 2.25 0 0 1 2.25 2.25v13.5A2.25 2.25 0 0 1 18 21H6a2.25 2.25 0 0 1-2.25-2.25V5.25Z" />
+						</svg>
+					</div>
+					<div class="space-y-2">
+						<div class="text-base font-semibold text-text">Group related traces into sessions</div>
+						<div class="text-sm text-text-muted">
+							Sessions are created by tagging traces with <span class="font-mono">session_id:&lt;your-session&gt;</span>. Once multiple traces share that tag, Traceway groups them here automatically.
+						</div>
+					</div>
+					<div class="space-y-2 text-left">
+						<div class="flex items-center justify-between gap-3">
+							<span class="text-xs font-medium text-text-muted">Example</span>
+							<a href={sessionsDocsHref} target="_blank" rel="noopener" class="text-xs text-accent hover:underline">Read session docs</a>
+						</div>
+						<pre class="rounded-md border border-border bg-bg-tertiary p-3 text-[12px] leading-relaxed text-text-secondary overflow-x-auto"><code>{sessionSnippet}</code></pre>
+					</div>
+					<div class="flex flex-wrap items-center justify-center gap-2">
+						<a href="/traces" class="btn-primary">Start tracing</a>
+						<a href="/spans" class="btn-secondary">Inspect spans</a>
+					</div>
+				</div>
 			</div>
 		</div>
 	{/if}

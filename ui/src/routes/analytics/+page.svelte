@@ -134,6 +134,8 @@
 		avg_latency: 'Trace duration (p99)',
 	};
 
+	const analyticsDocsHref = 'https://docs.traceway.ai/platform/analytics';
+
 	function loadLayout(): CardLayout[] {
 		if (typeof localStorage === 'undefined') return defaultLayout;
 		try {
@@ -509,9 +511,24 @@
 		<p class="text-text-muted text-sm">{error}</p>
 	</div>
 {:else if !summary || summary.total_spans === 0}
-	<div class="bg-bg-secondary border border-border rounded-md p-8 text-center space-y-2">
-		<div class="text-text-muted text-sm">No data yet</div>
-		<div class="text-text-muted/60 text-xs">Create some traces to see analytics.</div>
+	<div class="flex justify-center py-10 motion-rise-in">
+		<div class="table-float max-w-xl w-full p-8 text-center space-y-4 border border-border/60">
+			<div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-accent/30 bg-accent/10 text-accent">
+				<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+					<path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z" />
+				</svg>
+			</div>
+			<div class="space-y-2">
+				<h2 class="text-lg font-semibold text-text">Start tracing to see analytics</h2>
+				<p class="text-sm text-text-muted">
+					Analytics fill in automatically once Traceway receives spans. Instrument your app from the traces page, then come back here for latency, token, and cost trends.
+				</p>
+			</div>
+			<div class="flex flex-wrap items-center justify-center gap-2">
+				<a href="/traces" class="btn-primary">Open traces</a>
+				<a href={analyticsDocsHref} target="_blank" rel="noopener" class="btn-secondary">Read analytics docs</a>
+			</div>
+		</div>
 	</div>
 {:else}
 	<!-- Dashboard grid -->

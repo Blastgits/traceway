@@ -8,6 +8,7 @@
 	let loading = $state(true);
 	let q = $state('');
 	let selectedSpan: Span | null = $state(null);
+	const tracesDocsHref = 'https://docs.traceway.ai/platform/viewing-traces';
 
 	const filtered = $derived.by(() => {
 		const query = q.trim().toLowerCase();
@@ -66,7 +67,29 @@
 				{#if loading}
 					<div class="py-10 text-center text-sm text-text-muted">Loading spans...</div>
 				{:else if filtered.length === 0}
-					<div class="py-10 text-center text-sm text-text-muted">No spans found</div>
+					{#if q.trim()}
+						<div class="py-10 text-center text-sm text-text-muted">No spans match "{q.trim()}"</div>
+					{:else}
+						<div class="p-6">
+							<div class="table-float p-8 text-center space-y-4 border border-border/55">
+								<div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-accent/25 bg-accent/10 text-accent">
+									<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+										<path stroke-linecap="round" stroke-linejoin="round" d="M3 7.5A2.25 2.25 0 0 1 5.25 5.25h13.5A2.25 2.25 0 0 1 21 7.5v9A2.25 2.25 0 0 1 18.75 18.75H5.25A2.25 2.25 0 0 1 3 16.5v-9Zm4.5 2.25h9m-9 4.5h5.25" />
+									</svg>
+								</div>
+								<div class="space-y-2">
+									<div class="text-base font-semibold text-text">No spans yet</div>
+									<div class="text-sm text-text-muted">
+										Spans appear after Traceway receives trace data. Start from the traces page to instrument your app, then return here to inspect individual spans.
+									</div>
+								</div>
+								<div class="flex flex-wrap items-center justify-center gap-2">
+									<a href="/traces" class="btn-primary">Open traces</a>
+									<a href={tracesDocsHref} target="_blank" rel="noopener" class="btn-secondary">Viewing traces docs</a>
+								</div>
+							</div>
+						</div>
+					{/if}
 				{:else}
 					{#each filtered as s (s.id)}
 						{@const dur = spanDurationMs(s)}
