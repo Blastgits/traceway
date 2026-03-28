@@ -289,7 +289,8 @@ jobs:
           const server = http.createServer((req, res) => {
             if (!req.url) return sendJson(res, 400, { error: "missing url" });
             const url = new URL(req.url, "http://127.0.0.1:4000");
-            const path = url.pathname;
+            const rawPath = url.pathname;
+            const path = rawPath === "/api" ? "/" : rawPath.replace(/^\/api(?=\/)/, "");
 
             if (req.method === "GET" && path === "/auth/config") {
               return sendJson(res, 200, { mode: "cloud", features: ["auth", "teams", "api_keys"] });
