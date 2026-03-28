@@ -89,6 +89,7 @@
 
 <div class="space-y-5">
 	<h1 class="text-xl font-semibold tracking-tight">Dashboard</h1>
+	<p class="text-xs text-text-muted -mt-3">Auto-demo check: dashboard overview metrics</p>
 
 	{#if !loaded}
 		<div class="text-text-muted text-sm py-10 text-center">Loading...</div>
