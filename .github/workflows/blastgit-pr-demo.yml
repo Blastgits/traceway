@@ -91,17 +91,17 @@ jobs:
             });
 
             const routeRules = [
-              { prefix: 'ui/src/routes/review/', path: '/review', selector: 'main', label: 'Review' },
-              { prefix: 'ui/src/routes/approvals/', path: '/approvals', selector: 'main', label: 'Approvals' },
-              { prefix: 'ui/src/routes/traces/', path: '/traces', selector: 'main', label: 'Traces' },
-              { prefix: 'ui/src/routes/spans/', path: '/spans', selector: 'main', label: 'Spans' },
-              { prefix: 'ui/src/routes/datasets/', path: '/datasets', selector: 'main', label: 'Datasets' },
-              { prefix: 'ui/src/routes/sessions/', path: '/sessions', selector: 'main', label: 'Sessions' },
-              { prefix: 'ui/src/routes/replay/', path: '/replay/trace-demo-1', selector: 'main', label: 'Replay' },
-              { prefix: 'ui/src/routes/query/', path: '/query', selector: 'main', label: 'Query' },
-              { prefix: 'ui/src/routes/analytics/', path: '/analytics', selector: 'main', label: 'Analytics' },
-              { prefix: 'ui/src/routes/settings/', path: '/settings', selector: 'main', label: 'Settings' },
-              { prefix: 'ui/src/routes/+page.svelte', path: '/', selector: 'main', label: 'Dashboard' },
+              { prefix: 'ui/src/routes/review/', path: '/review', selector: 'main', label: 'Review', action: '' },
+              { prefix: 'ui/src/routes/approvals/', path: '/approvals', selector: 'main', label: 'Approvals', action: '' },
+              { prefix: 'ui/src/routes/traces/', path: '/traces', selector: 'main', label: 'Traces', action: '' },
+              { prefix: 'ui/src/routes/spans/', path: '/spans', selector: 'main', label: 'Spans', action: '' },
+              { prefix: 'ui/src/routes/datasets/', path: '/datasets', selector: 'main', label: 'Datasets', action: '' },
+              { prefix: 'ui/src/routes/sessions/', path: '/sessions', selector: 'main', label: 'Sessions', action: '' },
+              { prefix: 'ui/src/routes/replay/', path: '/traces', selector: 'main', label: 'Traces', action: 'open_replay' },
+              { prefix: 'ui/src/routes/query/', path: '/query', selector: 'main', label: 'Query', action: '' },
+              { prefix: 'ui/src/routes/analytics/', path: '/analytics', selector: 'main', label: 'Analytics', action: '' },
+              { prefix: 'ui/src/routes/settings/', path: '/settings', selector: 'main', label: 'Settings', action: '' },
+              { prefix: 'ui/src/routes/+page.svelte', path: '/', selector: 'main', label: 'Dashboard', action: '' },
             ];
 
             const uiFiles = files.filter((file) => file.filename.startsWith('ui/src/'));
@@ -189,6 +189,7 @@ jobs:
             core.setOutput('demo_path', selectedRule.path);
             core.setOutput('demo_selector', selectedRule.selector);
             core.setOutput('demo_nav_label', selectedRule.label || '');
+            core.setOutput('demo_action', selectedRule.action || '');
             core.setOutput('expected_text', expectedText);
 
       - name: Install UI dependencies
@@ -418,6 +419,7 @@ jobs:
           DEMO_PATH: ${{ steps.meta.outputs.demo_path }}
           DEMO_SELECTOR: ${{ steps.meta.outputs.demo_selector }}
           DEMO_NAV_LABEL: ${{ steps.meta.outputs.demo_nav_label }}
+          DEMO_ACTION: ${{ steps.meta.outputs.demo_action }}
           DEMO_EXPECTED_TEXT: ${{ steps.meta.outputs.expected_text }}
           OUT_WEBM: ${{ github.workspace }}/pr-demo.webm
         shell: bash
@@ -522,7 +524,7 @@ jobs:
             await page.waitForTimeout(900);
           }
 
-          async function playTargetSequence(page, base, targetPath, targetSelector, targetNavLabel, expectedText, prTitle, prNumber) {
+          async function playTargetSequence(page, base, targetPath, targetSelector, targetNavLabel, demoAction, expectedText, prTitle, prNumber) {
             const path = targetPath.startsWith("/") ? targetPath : `/${targetPath}`;
             if (path === "/") {
               await gotoStable(page, base, null, "opening app root");
@@ -557,6 +559,15 @@ jobs:
             }
             await ensureExpectedText(page, expectedText, `verifying expected text on ${path}`);
 
+            if (demoAction === "open_replay") {
+              const openedReplay = await clickIfPresent(page, "a[href^='/replay/']");
+              if (!openedReplay) {
+                throw new Error("Replay target action failed: no replay link found on traces page");
+              }
+              await page.waitForURL((url) => new URL(url.toString()).pathname.startsWith("/replay/"), { timeout: 20000 });
+              await page.waitForTimeout(900);
+            }
+
             const prLabel = prNumber ? `#${prNumber}` : "";
             await hoverFirstMatch(page, [
               `[data-pr-number='${prNumber}']`,
@@ -588,6 +599,7 @@ jobs:
             const demoPath = (process.env.DEMO_PATH || "/review").trim();
             const demoSelector = (process.env.DEMO_SELECTOR || "").trim();
             const demoNavLabel = (process.env.DEMO_NAV_LABEL || "").trim();
+            const demoAction = (process.env.DEMO_ACTION || "").trim();
             const expectedText = (process.env.DEMO_EXPECTED_TEXT || "").trim();
 
             const browser = await chromium.launch({ headless: true });
@@ -632,7 +644,7 @@ jobs:
             );
             await page.waitForTimeout(140);
 
-            await playTargetSequence(page, base, demoPath, demoSelector, demoNavLabel, expectedText, prTitle, prNumber);
+            await playTargetSequence(page, base, demoPath, demoSelector, demoNavLabel, demoAction, expectedText, prTitle, prNumber);
             await applyDarkBackdrop(page);
 
             await page.waitForTimeout(1400);
