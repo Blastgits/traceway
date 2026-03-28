@@ -61,7 +61,6 @@ jobs:
         shell: bash
         run: |
           npm ci
-          npm install --no-save playwright
 
       - name: Install browser dependencies
         working-directory: ui
@@ -69,11 +68,196 @@ jobs:
         run: |
           npx playwright install --with-deps chromium
 
+      - name: Start mock API server
+        shell: bash
+        env:
+          PR_TITLE: ${{ steps.meta.outputs.pr_title }}
+          PR_NUMBER: ${{ steps.meta.outputs.pr_number }}
+        run: |
+          node <<'NODE' > /tmp/blastgit-demo-mock.log 2>&1 &
+          const http = require("node:http");
+
+          const prTitle = (process.env.PR_TITLE || "Traceway PR").trim();
+          const prNumber = (process.env.PR_NUMBER || "0").trim();
+          const nowIso = new Date().toISOString();
+
+          const demoProject = {
+            id: "project-demo-1",
+            org_id: "org-demo-1",
+            name: "Blastgit Demo",
+            slug: "blastgit-demo",
+            created_at: nowIso,
+            updated_at: nowIso,
+          };
+
+          const demoQueueItem = {
+            id: "queue-item-demo-1",
+            dataset_id: "dataset-demo-1",
+            status: "pending",
+            claimed_by: null,
+            original_data: {
+              type: "generic",
+              input: `PR #${prNumber}: ${prTitle}`,
+              expected_output: "Show merged PR preview with hover video",
+            },
+            edited_data: null,
+            created_at: nowIso,
+            updated_at: nowIso,
+          };
+
+          const demoDataset = {
+            id: "dataset-demo-1",
+            name: "PR Review Queue",
+            description: "Mocked queue for CI demo capture",
+            datapoint_count: 1,
+          };
+
+          const demoSpan = {
+            id: "span-demo-1",
+            trace_id: "trace-demo-1",
+            parent_id: null,
+            name: `Review ${prTitle}`,
+            status: "completed",
+            kind: { type: "llm_call", provider: "openai", model: "gpt-4o-mini" },
+            input: "Inspect PR changes",
+            output: "Looks good",
+            started_at: nowIso,
+            ended_at: nowIso,
+            tags: [],
+          };
+
+          function sendJson(res, status, payload) {
+            res.writeHead(status, {
+              "content-type": "application/json; charset=utf-8",
+              "access-control-allow-origin": "*",
+            });
+            res.end(JSON.stringify(payload));
+          }
+
+          function sendSse(req, res) {
+            res.writeHead(200, {
+              "content-type": "text/event-stream",
+              "cache-control": "no-cache, no-transform",
+              connection: "keep-alive",
+              "access-control-allow-origin": "*",
+            });
+            res.write("id: 1\n");
+            res.write(`data: ${JSON.stringify({ type: "span_created", span: demoSpan })}\n\n`);
+            const heartbeat = setInterval(() => {
+              res.write(": ping\n\n");
+            }, 15000);
+            req.on("close", () => clearInterval(heartbeat));
+          }
+
+          const server = http.createServer((req, res) => {
+            if (!req.url) return sendJson(res, 400, { error: "missing url" });
+            const url = new URL(req.url, "http://127.0.0.1:4000");
+            const path = url.pathname;
+
+            if (req.method === "GET" && path === "/auth/config") {
+              return sendJson(res, 200, { mode: "cloud", features: ["auth", "teams", "api_keys"] });
+            }
+
+            if (req.method === "GET" && path === "/auth/me") {
+              return sendJson(res, 200, {
+                org_id: "org-demo-1",
+                project_id: "project-demo-1",
+                user_id: "user-demo-1",
+                scopes: ["traces_read", "traces_write", "datasets_read", "datasets_write", "analytics_read", "admin"],
+                is_local_mode: false,
+              });
+            }
+
+            if (req.method === "GET" && path === "/projects") {
+              return sendJson(res, 200, [demoProject]);
+            }
+
+            if (req.method === "GET" && path === "/stats") {
+              return sendJson(res, 200, { trace_count: 14, span_count: 67 });
+            }
+
+            if (req.method === "GET" && path === "/analytics/summary") {
+              return sendJson(res, 200, {
+                total_traces: 14,
+                total_spans: 67,
+                avg_latency_ms: 412,
+                total_llm_calls: 24,
+                total_tokens: 58221,
+                total_cost: 12.74,
+                error_count: 1,
+                models_used: ["gpt-4o-mini"],
+                providers_used: ["openai"],
+                cost_by_model: [{ model: "gpt-4o-mini", span_count: 24, cost: 12.74 }],
+                tokens_by_model: [{ model: "gpt-4o-mini", input_tokens: 30112, output_tokens: 28109, total_tokens: 58221 }],
+              });
+            }
+
+            if (req.method === "GET" && path === "/spans") {
+              return sendJson(res, 200, {
+                items: [demoSpan],
+                total: 1,
+                next_cursor: null,
+                has_more: false,
+              });
+            }
+
+            if (req.method === "GET" && path === "/traces") {
+              return sendJson(res, 200, {
+                items: [{
+                  id: "trace-demo-1",
+                  name: `PR #${prNumber} Demo`,
+                  status: "completed",
+                  started_at: nowIso,
+                  ended_at: nowIso,
+                  tags: ["blastgit", `pr:${prNumber}`],
+                }],
+                total: 1,
+                next_cursor: null,
+                has_more: false,
+              });
+            }
+
+            if (req.method === "GET" && path === "/datasets") {
+              return sendJson(res, 200, { datasets: [demoDataset], count: 1 });
+            }
+
+            if (req.method === "GET" && path === "/queue") {
+              return sendJson(res, 200, {
+                items: [demoQueueItem],
+                total: 1,
+                next_cursor: null,
+                has_more: false,
+              });
+            }
+
+            if (req.method === "POST" && /^\/queue\/[^/]+\/claim$/.test(path)) {
+              return sendJson(res, 200, { ...demoQueueItem, status: "claimed", claimed_by: "blastgit-demo" });
+            }
+
+            if (req.method === "POST" && /^\/queue\/[^/]+\/submit$/.test(path)) {
+              return sendJson(res, 200, { ...demoQueueItem, status: "completed", claimed_by: "blastgit-demo" });
+            }
+
+            if (req.method === "GET" && path === "/org/members") {
+              return sendJson(res, 200, [{ id: "user-demo-1", email: "demo@blastgit.ai", name: "Blastgit Demo", role: "owner" }]);
+            }
+
+            if (req.method === "GET" && path === "/events") {
+              return sendSse(req, res);
+            }
+
+            return sendJson(res, 404, { code: "not_found", message: "endpoint not found", details: null });
+          });
+
+          server.listen(4000, "127.0.0.1");
+          NODE
+          echo $! > /tmp/blastgit-demo-mock.pid
+
       - name: Start UI dev server
         working-directory: ui
         shell: bash
         run: |
-          VITE_API_PROXY_TARGET=https://api.traceway.ai npm run dev -- --host 127.0.0.1 --port 4173 > /tmp/blastgit-demo-server.log 2>&1 &
+          npm run dev -- --host 127.0.0.1 --port 4173 > /tmp/blastgit-demo-server.log 2>&1 &
           echo $! > /tmp/blastgit-demo-server.pid
 
       - name: Wait for app
@@ -100,7 +284,6 @@ jobs:
         run: |
           node <<'NODE'
           const fs = require("node:fs");
-          const crypto = require("node:crypto");
           const { chromium } = require("playwright");
 
           async function gotoFirstReachable(page, urls) {
@@ -116,38 +299,8 @@ jobs:
             throw new Error("No reachable demo route");
           }
 
-          async function ensureAuthenticated(page, base) {
-            const runTag = Date.now().toString(36);
-            const email = `blastgit-demo+${runTag}-${crypto.randomBytes(3).toString("hex")}@example.com`;
-            const password = `Traceway!${Date.now()}Aa`;
-
-            await page.goto(`${base}signup`, { waitUntil: "domcontentloaded", timeout: 60000 });
-            await page.waitForSelector("input#email", { timeout: 30000 });
-
-            await page.locator("input#name").fill("Blastgit Demo Bot");
-            await page.locator("input#org-name").fill(`Blastgit Demo ${runTag}`);
-            await page.locator("input#email").fill(email);
-            await page.locator("input#password").fill(password);
-            await page.locator("button[type='submit']").click();
-
-            try {
-              await page.waitForFunction(
-                () => !["/signup", "/login"].includes(window.location.pathname),
-                { timeout: 45000 }
-              );
-            } catch (error) {
-              const currentPath = new URL(page.url()).pathname;
-              const body = await page.locator("body").innerText().catch(() => "");
-              throw new Error(
-                `Auth did not complete (stuck on ${currentPath}). Body snippet: ${body.slice(0, 280)}`
-              );
-            }
-
-            await page.waitForTimeout(1200);
-          }
-
           async function visitRoutes(page, base, prTitle, prNumber) {
-            const routes = ["/", "/review", "/approvals", "/traces"];
+            const routes = ["/", "/review"];
             for (const route of routes) {
               try {
                 await page.goto(`${base}${route.slice(1)}`, { waitUntil: "domcontentloaded", timeout: 45000 });
@@ -202,8 +355,7 @@ jobs:
               },
             });
             const page = await context.newPage();
-            await gotoFirstReachable(page, [base, `${base}signup`, `${base}login`, `${base}traces`, `${base}docs`]);
-            await ensureAuthenticated(page, base);
+            await gotoFirstReachable(page, [base, `${base}review`, `${base}traces`, `${base}docs`]);
             await visitRoutes(page, base, prTitle, prNumber);
 
             await page.evaluate(() => window.scrollTo({ top: 420, behavior: "smooth" }));
@@ -245,13 +397,18 @@ jobs:
           if [ -f /tmp/blastgit-demo-server.pid ]; then
             kill "$(cat /tmp/blastgit-demo-server.pid)" >/dev/null 2>&1 || true
           fi
+          if [ -f /tmp/blastgit-demo-mock.pid ]; then
+            kill "$(cat /tmp/blastgit-demo-mock.pid)" >/dev/null 2>&1 || true
+          fi
 
       - name: Upload server log (on failure)
         if: failure()
         uses: actions/upload-artifact@v7
         with:
           name: blastgit-pr-demo-server-log
-          path: /tmp/blastgit-demo-server.log
+          path: |
+            /tmp/blastgit-demo-server.log
+            /tmp/blastgit-demo-mock.log
 
       - name: Upload demo artifact
         uses: actions/upload-artifact@v7
