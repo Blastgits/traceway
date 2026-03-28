@@ -73,7 +73,7 @@ jobs:
         working-directory: ui
         shell: bash
         run: |
-          VITE_API_URL=https://api.traceway.ai npm run dev -- --host 127.0.0.1 --port 4173 > /tmp/blastgit-demo-server.log 2>&1 &
+          VITE_API_PROXY_TARGET=https://api.traceway.ai npm run dev -- --host 127.0.0.1 --port 4173 > /tmp/blastgit-demo-server.log 2>&1 &
           echo $! > /tmp/blastgit-demo-server.pid
 
       - name: Wait for app
@@ -94,11 +94,13 @@ jobs:
         env:
           DEMO_URL: http://127.0.0.1:4173/
           PR_TITLE: ${{ steps.meta.outputs.pr_title }}
+          PR_NUMBER: ${{ steps.meta.outputs.pr_number }}
           OUT_WEBM: ${{ github.workspace }}/pr-demo.webm
         shell: bash
         run: |
           node <<'NODE'
           const fs = require("node:fs");
+          const crypto = require("node:crypto");
           const { chromium } = require("playwright");
 
           async function gotoFirstReachable(page, urls) {
@@ -114,8 +116,83 @@ jobs:
             throw new Error("No reachable demo route");
           }
 
+          async function ensureAuthenticated(page, base) {
+            const runTag = Date.now().toString(36);
+            const email = `blastgit-demo+${runTag}-${crypto.randomBytes(3).toString("hex")}@example.com`;
+            const password = `Traceway!${Date.now()}Aa`;
+
+            await page.goto(`${base}signup`, { waitUntil: "domcontentloaded", timeout: 60000 });
+            await page.waitForSelector("input#email", { timeout: 30000 });
+
+            await page.locator("input#name").fill("Blastgit Demo Bot");
+            await page.locator("input#org-name").fill(`Blastgit Demo ${runTag}`);
+            await page.locator("input#email").fill(email);
+            await page.locator("input#password").fill(password);
+            await page.locator("button[type='submit']").click();
+
+            try {
+              await page.waitForFunction(
+                () => !["/signup", "/login"].includes(window.location.pathname),
+                { timeout: 45000 }
+              );
+            } catch (error) {
+              const currentPath = new URL(page.url()).pathname;
+              const body = await page.locator("body").innerText().catch(() => "");
+              throw new Error(
+                `Auth did not complete (stuck on ${currentPath}). Body snippet: ${body.slice(0, 280)}`
+              );
+            }
+
+            await page.waitForTimeout(1200);
+          }
+
+          async function visitRoutes(page, base, prTitle, prNumber) {
+            const routes = ["/", "/review", "/approvals", "/traces"];
+            for (const route of routes) {
+              try {
+                await page.goto(`${base}${route.slice(1)}`, { waitUntil: "domcontentloaded", timeout: 45000 });
+                const redirectedToAuth = await page.evaluate(() =>
+                  ["/login", "/signup"].includes(window.location.pathname)
+                );
+                if (redirectedToAuth) {
+                  throw new Error(`Auth session lost while visiting ${route}`);
+                }
+                await page.waitForTimeout(800);
+              } catch (error) {
+                if (error instanceof Error && error.message.includes("Auth session lost")) {
+                  throw error;
+                }
+                // Continue through best-effort route walkthrough.
+              }
+            }
+
+            const prLabel = `#${prNumber || ""}`.trim();
+            const hoverCandidates = [
+              `[data-pr-number='${prNumber}']`,
+              `a:has-text("${prLabel}")`,
+              `a:has-text("${prTitle}")`,
+              `text=${prLabel}`,
+              "a,button,[role='button']"
+            ];
+
+            for (const selector of hoverCandidates) {
+              const match = page.locator(selector).first();
+              if (await match.count()) {
+                const box = await match.boundingBox();
+                if (box) {
+                  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+                  await page.waitForTimeout(900);
+                  break;
+                }
+              }
+            }
+          }
+
           (async () => {
             const outWebm = process.env.OUT_WEBM;
+            const base = process.env.DEMO_URL;
+            const prTitle = (process.env.PR_TITLE || "").trim();
+            const prNumber = (process.env.PR_NUMBER || "").trim();
             const browser = await chromium.launch({ headless: true });
             const context = await browser.newContext({
               viewport: { width: 1280, height: 720 },
@@ -125,27 +202,16 @@ jobs:
               },
             });
             const page = await context.newPage();
-            const base = process.env.DEMO_URL;
-            await gotoFirstReachable(page, [base, `${base}traces`, `${base}signup`, `${base}docs`]);
+            await gotoFirstReachable(page, [base, `${base}signup`, `${base}login`, `${base}traces`, `${base}docs`]);
+            await ensureAuthenticated(page, base);
+            await visitRoutes(page, base, prTitle, prNumber);
 
-            await page.waitForTimeout(1500);
-            await page.mouse.move(180, 120);
-            await page.waitForTimeout(350);
-            await page.evaluate(() => window.scrollTo({ top: 520, behavior: "smooth" }));
-            await page.waitForTimeout(900);
-            await page.evaluate(() => window.scrollTo({ top: 1160, behavior: "smooth" }));
-            await page.waitForTimeout(900);
+            await page.evaluate(() => window.scrollTo({ top: 420, behavior: "smooth" }));
+            await page.waitForTimeout(800);
+            await page.evaluate(() => window.scrollTo({ top: 980, behavior: "smooth" }));
+            await page.waitForTimeout(800);
             await page.evaluate(() => window.scrollTo({ top: 0, behavior: "smooth" }));
-            await page.waitForTimeout(900);
-
-            const nodes = await page.locator("a,button,[role='button']").elementHandles();
-            for (const node of nodes.slice(0, 8)) {
-              const box = await node.boundingBox();
-              if (!box) continue;
-              await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-              await page.waitForTimeout(220);
-            }
-            await page.waitForTimeout(1500);
+            await page.waitForTimeout(2200);
 
             const video = page.video();
             await context.close();
